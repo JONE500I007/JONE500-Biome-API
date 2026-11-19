@@ -1,0 +1,18 @@
+{
+	"required": true,
+	"package": "net.biome.api.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"BiomeSourceAccessor",
+		"ChunkGeneratorAccessor",
+		"MultiNoiseBiomeSourceMixin",
+		"TheEndBiomeSourceMixin",
+		"NoiseBasedChunkGeneratorMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

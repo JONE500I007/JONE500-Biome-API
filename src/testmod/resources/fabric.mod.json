@@ -1,0 +1,29 @@
+{
+	"schemaVersion": 1,
+	"id": "biome_test",
+	"version": "${version}",
+	"name": "Biome API Test Mod",
+	"description": "Example regions made with JONE500 Biome API. Dev only.",
+	"license": "MIT",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"net.biome.testmod.BiomeTestMod"
+		],
+		"fabric-datagen": [
+			"net.biome.testmod.BiomeTestModDataGen"
+		],
+		"fabric-gametest": [
+			"net.biome.testmod.BiomeServerGameTest",
+			"net.biome.testmod.BiomeRobustnessGameTest"
+		],
+		"fabric-client-gametest": [
+			"net.biome.testmod.BiomeClientGameTest",
+			"net.biome.testmod.BiomeWorldGenClientGameTest"
+		]
+	},
+	"depends": {
+		"jone500-biome-api": "*",
+		"fabric-api": "*"
+	}
+}

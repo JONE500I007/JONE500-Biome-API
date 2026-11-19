@@ -1,0 +1,12 @@
+{
+  "values": [
+    {
+      "id": "biome_test:mint_meadow",
+      "required": false
+    },
+    {
+      "id": "biome_test:amber_meadow",
+      "required": false
+    }
+  ]
+}

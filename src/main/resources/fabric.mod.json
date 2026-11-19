@@ -1,0 +1,32 @@
+{
+	"schemaVersion": 1,
+	"id": "jone500-biome-api",
+	"version": "${version}",
+	"name": "JONE500 Biome API",
+	"description": "A library for adding Overworld biomes in regions that are deterministic (sorted by id) and can swap or skip biomes per region patch.",
+	"authors": [
+		"JONE500"
+	],
+	"license": "MIT",
+	"icon": "assets/jone500-biome-api/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"net.biome.api.JONE500BiomeAPI"
+		]
+	},
+	"mixins": [
+		"jone500-biome-api.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.20.1",
+		"minecraft": "~26.1",
+		"java": ">=25",
+		"fabric-api": "*"
+	},
+	"custom": {
+		"modmenu": {
+			"badges": ["library"]
+		}
+	}
+}

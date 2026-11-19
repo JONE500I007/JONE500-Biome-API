@@ -1,0 +1,142 @@
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+	id 'maven-publish'
+}
+
+// Version = mod version + Minecraft version, e.g. 0.1.0+26.1, so the builds for different
+// Minecraft versions never share a version number (on Modrinth or in the jar name).
+version = "${project.mod_version}+${project.minecraft_version}"
+
+base {
+	archivesName = project.archives_base_name
+}
+
+repositories {
+	// Loom adds the repositories needed for Minecraft, Fabric Loader and Fabric API automatically.
+}
+
+// ---------------------------------------------------------------------------
+// "testmod" source set: an example mod that USES the Biome API, plus the automated tests.
+// It is only for the dev environment and is NOT included in the published jar.
+// ---------------------------------------------------------------------------
+sourceSets {
+	testmod {
+		compileClasspath += main.compileClasspath + main.output
+		runtimeClasspath += main.runtimeClasspath + main.output
+		resources.srcDir 'src/testmod/generated'
+	}
+}
+
+loom {
+	mods {
+		"jone500-biome-api" {
+			sourceSet sourceSets.main
+		}
+		"biome_test" {
+			sourceSet sourceSets.testmod
+		}
+	}
+
+	runs {
+		// Minecraft with the Biome API + the example biomes from the testmod.
+		testmodClient {
+			client()
+			configName = "Testmod Client"
+			source sourceSets.testmod
+			runDir "run"
+		}
+		testmodServer {
+			server()
+			configName = "Testmod Server"
+			source sourceSets.testmod
+			runDir "run/server"
+		}
+		// Automated test on a real dedicated server: samples biomes over a large area.
+		gameTest {
+			server()
+			configName = "Server Game Test"
+			vmArg "-Dfabric-api.gametest"
+			vmArg "-Dfabric-api.gametest.report-file=${file("build/run/gameTest/junit.xml")}"
+			source sourceSets.testmod
+			runDir "build/run/gameTest"
+		}
+		// Automated in-game test in a real singleplayer world: finds red plains and takes a screenshot.
+		clientGameTest {
+			client()
+			configName = "Client Game Test"
+			vmArg "-Dfabric.client.gametest"
+			source sourceSets.testmod
+			runDir "build/run/clientGameTest"
+		}
+		// Runs data generation for the testmod.
+		datagen {
+			client()
+			configName = "Data Generation (testmod)"
+			vmArg "-Dfabric-api.datagen"
+			vmArg "-Dfabric-api.datagen.output-dir=${file("src/testmod/generated")}"
+			vmArg "-Dfabric-api.datagen.modid=biome_test"
+			source sourceSets.testmod
+			runDir "build/datagen"
+		}
+	}
+}
+
+dependencies {
+	// To change the versions see the gradle.properties file
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+	// Fabric API is required by the Biome API.
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+}
+
+processResources {
+	def version = project.version
+	inputs.property "version", version
+
+	filesMatching("fabric.mod.json") {
+		expand "version": version
+	}
+}
+
+processTestmodResources {
+	def version = project.version
+	inputs.property "version", version
+
+	filesMatching("fabric.mod.json") {
+		expand "version": version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+}
+
+java {
+	// Publishes a -sources.jar next to the main jar so modders can read the API code in their IDE.
+	withSourcesJar()
+
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}
+
+jar {
+	def projectName = project.name
+	inputs.property "projectName", projectName
+
+	from("LICENSE") {
+		rename { "${it}_$projectName"}
+	}
+}
+
+publishing {
+	publications {
+		create("mavenJava", MavenPublication) {
+			artifactId = project.archives_base_name
+			from components.java
+		}
+	}
+
+	repositories {
+	}
+}
