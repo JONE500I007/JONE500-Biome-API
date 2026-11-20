@@ -120,6 +120,15 @@ public final class BiomeRegion {
 		}
 
 		/**
+		 * Makes this an <b>Overworld</b> region. This is the default, so it is only needed to make the code easier
+		 * to read ({@code BiomeRegion.builder(id).overworld()...}).
+		 */
+		public Builder overworld() {
+			this.dimension = RegionDimension.OVERWORLD;
+			return this;
+		}
+
+		/**
 		 * Makes this a <b>Nether</b> region. Everything works the same as in the Overworld (weights, chances,
 		 * exclusive, strict). The Nether has only 5 vanilla biomes, placed by temperature and humidity:
 		 * replace them ({@code .replace(Biomes.CRIMSON_FOREST, ...)}) or add your biome at its own point with

@@ -99,10 +99,33 @@ public static void bootstrap(BootstrapContext<Biome> context) {
 | `.farmAnimals()`, `.defaultMonsters()`, `.caveCreatures()`, `.plainsMobs()` | Vanilla mob sets |
 | `.spawn(type, weight, min, max)`, `.spawn(category, type, ...)`, `.spawns(...)`, `.animalSpawnChance(f)` | Your own mob spawns |
 
-> **Feature order matters.** If two biomes contain the same features, they must be in the same order in
-> both, or Minecraft stops with "Feature order cycle". Use vanilla's `BiomeDefaultFeatures` helpers for
-> vanilla features (they keep vanilla's order) and add your own features after them. The Biome API checks
-> this when a world loads and tells you which biomes conflict.
+### Read this before using `addFeature`: feature order and duplicates (warning)
+
+This is a **Minecraft rule**, not a Biome API rule, but it is the most common reason a world with new
+biomes does not load. Minecraft puts the features of **all biomes** (vanilla, yours and other mods') into
+one order per generation step. If that is impossible, the world stops loading with
+**"Feature order cycle found"**.
+
+Two things break it (both checked by this API's own tests):
+
+1. **The same feature twice in one biome.** `BiomeMaker.overworld(...)` already has every vanilla ore and
+   the sand/clay/gravel disks, so adding `OrePlacements.ORE_DIAMOND` again breaks the world.
+2. **Two biomes with the same features in opposite order.** Biome A has pumpkins then sugar cane,
+   biome B has sugar cane then pumpkins: each is fine alone, both together break the world.
+
+How to stay safe:
+- For vanilla features use vanilla's `BiomeDefaultFeatures` helpers, or the `BiomeMaker` methods
+  (`.vanillaOres()`, `.vanillaDisks()`, ...). They add features in vanilla's order.
+- Add **your own** features (your own placed features) **after** the vanilla ones.
+- If you add single vanilla features with `addFeature`, keep vanilla's order (e.g. stone veins, then ores
+  from coal to diamond, then disks) and never add one that is already there.
+- Use the same order for the same features in all of your biomes.
+
+> **We can't check every combination for you.** There are hundreds of vanilla features and any mod can add
+> more, so we do not know in advance which `addFeature(...)` combination conflicts with which biome, also
+> biomes from other mods. The Biome API checks the order when a world loads and stops with a message that
+> says which biomes conflict, so you find out right away. **Always create a new world to test after
+> changing features**, with the other biome mods you want to support installed too.
 
 ### Structures and mob variants: `VanillaBiomeTags`
 
@@ -177,6 +200,7 @@ BiomeRegion.builder(Identifier.fromNamespaceAndPath("mymod", "orchards"))
 
 | Method | What it does |
 |---|---|
+| `.overworld()` / `.nether()` | Which dimension the region is in. Default: Overworld |
 | `.weight(float)` | How often this region's patches appear. Vanilla = 10. Decimals allowed. Default 1. |
 | `.replace(vanilla, yours)` | Inside this region, `vanilla` becomes `yours` |
 | `.replace(vanilla, yours, chance)` | Same, but only in `chance` (0-1) of this region's patches; elsewhere the vanilla biome stays |
@@ -315,6 +339,19 @@ gone. This works in the whole Overworld, also inside regions where they keep the
 | `chance` means | % of your region's patches | % of the vanilla biome's area |
 | Patch size | Region patches (~512 blocks) | Small patches (~256 blocks, `BiomeReplacements.setPatchSize`) |
 
+### Only vanilla biomes: change how often they appear
+
+You don't need a biome of your own: the replacement can be a vanilla biome too.
+
+```java
+BiomeReplacements.replace(Biomes.DESERT, Biomes.SAVANNA, 0.5F);          // half as much desert, more savanna
+BiomeReplacements.replace(Biomes.PLAINS, Biomes.SUNFLOWER_PLAINS, 0.3F); // more sunflower plains
+BiomeReplacements.replaceWholeBiome(Biomes.MUSHROOM_FIELDS, Biomes.DEEP_OCEAN, 1.0F); // no mushroom islands
+```
+
+Pick a replacement that fits the place (similar temperature and terrain): desert to savanna is fine, desert
+to snowy plains looks wrong. A biome can only get more common by taking area from other biomes.
+
 ## 4. Surface rules (optional)
 
 ```java
@@ -377,6 +414,183 @@ cities, `is_end`) with `VanillaBiomeTags.copy(Biomes.END_HIGHLANDS, ...)`.
 
 Create a **new** world (regions only apply to worlds created with the mod) and press **F3**: the line
 `Biome API region: ...` shows which region you are in. `/locate biome mymod:apple_grove` works too.
+
+## 6. More examples
+
+All examples below compile against this version of the API. `ModBiomes.*` are your own biome keys.
+
+### Biomes: vanilla helpers and your own features together
+
+`BiomeMaker.overworld(context)` already has vanilla's caves, ores and disks, so you only add what is
+different. Vanilla's `BiomeDefaultFeatures` helpers and your own `addFeature(...)` can be mixed freely:
+
+```java
+// A forest: vanilla flowers, birch trees and grass + emeralds + pumpkins
+context.register(ModBiomes.CLAY_FOREST, BiomeMaker.overworld(context)
+        .temperature(0.7F)
+        .downfall(0.8F)
+        .farmAnimals()
+        .defaultMonsters()
+        .features(BiomeDefaultFeatures::addForestFlowers)
+        .features(BiomeDefaultFeatures::addOtherBirchTrees)
+        .features(BiomeDefaultFeatures::addDefaultFlowers)
+        .features(BiomeDefaultFeatures::addForestGrass)
+        .features(BiomeDefaultFeatures::addDefaultMushrooms)
+        .emeralds()                                                                              // like mountains
+        .addFeature(GenerationStep.Decoration.VEGETAL_DECORATION, VegetationPlacements.PATCH_PUMPKIN)
+        .build());
+```
+
+Pick only some underground parts with `BiomeMaker.empty(context)` and add the ores you want yourself:
+
+```java
+// Caves full of diamonds and clay, but no coal, gold, redstone...
+context.register(ModBiomes.DIAMOND_CAVES, BiomeMaker.empty(context)
+        .temperature(0.8F)
+        .downfall(0.4F)
+        .vanillaCaves()                                     // caves, canyons, lava lakes
+        .vanillaStoneVeins()                                // granite, diorite, andesite, tuff, dirt, gravel
+        .addFeature(GenerationStep.Decoration.LOCAL_MODIFICATIONS, CavePlacements.AMETHYST_GEODE)
+        .addFeature(GenerationStep.Decoration.UNDERGROUND_ORES, OrePlacements.ORE_IRON_UPPER)
+        .addFeature(GenerationStep.Decoration.UNDERGROUND_ORES, OrePlacements.ORE_IRON_MIDDLE)
+        .addFeature(GenerationStep.Decoration.UNDERGROUND_ORES, OrePlacements.ORE_DIAMOND)
+        .addFeature(GenerationStep.Decoration.UNDERGROUND_ORES, OrePlacements.ORE_DIAMOND_LARGE)
+        .addFeature(GenerationStep.Decoration.UNDERGROUND_ORES, OrePlacements.ORE_DIAMOND_BURIED)
+        .addFeature(GenerationStep.Decoration.UNDERGROUND_ORES, MiscOverworldPlacements.DISK_CLAY)
+        .caveCreatures()                                    // bats, glow squid
+        .build());
+```
+
+> **Don't add a vanilla feature twice.** `overworld(...)` already contains every vanilla ore and the
+> sand/clay/gravel disks, so `.addFeature(UNDERGROUND_ORES, OrePlacements.ORE_DIAMOND)` on top of it adds
+> diamonds twice and the world does not load ("Feature order cycle found"). For more of a vanilla ore, start
+> from `empty(...)` (like above) or make your own placed feature. See
+> [Read this before using `addFeature`](#read-this-before-using-addfeature-feature-order-and-duplicates-warning).
+
+### Mobs: vanilla helpers and your own spawns together
+
+```java
+context.register(ModBiomes.SLIME_MARSH, BiomeMaker.overworld(context)
+        .temperature(0.8F)
+        .downfall(0.9F)
+        .spawns(BiomeDefaultFeatures::farmAnimals)                             // vanilla helper (= .farmAnimals())
+        .spawns(BiomeDefaultFeatures::commonSpawns)                            // vanilla helper (= .defaultMonsters())
+        .spawn(EntityType.SLIME, 100, 1, 4)                                    // monster (default category)
+        .spawn(MobCategory.CREATURE, EntityType.FROG, 10, 2, 5)                // pick the category yourself
+        .spawn(MobCategory.WATER_AMBIENT, EntityType.TROPICAL_FISH, 25, 8, 8)
+        .animalSpawnChance(0.07F)                                              // more animals when chunks generate
+        .features(BiomeDefaultFeatures::addSwampVegetation)
+        .build());
+```
+
+| Vanilla spawn helper | What it adds |
+|---|---|
+| `BiomeDefaultFeatures::farmAnimals` | Sheep, pigs, chickens, cows |
+| `BiomeDefaultFeatures::commonSpawns` | Zombies, skeletons, creepers, spiders, endermen, witches, slimes, drowned + bats, glow squid |
+| `BiomeDefaultFeatures::plainsSpawns` | Farm animals + horses, donkeys + common monsters |
+| `BiomeDefaultFeatures::desertSpawns` | Rabbits, camels, husks, parched + the usual monsters |
+| `BiomeDefaultFeatures::caveSpawns` | Bats, glow squid |
+| `BiomeDefaultFeatures::mooshroomSpawns` | Mooshrooms + bats, glow squid (no monsters) |
+
+Several helpers in one call work with a lambda: `.spawns(s -> { BiomeDefaultFeatures.farmAnimals(s); BiomeDefaultFeatures.caveSpawns(s); })`.
+
+### A dry biome and a Nether biome
+
+```java
+context.register(ModBiomes.DUNES, BiomeMaker.overworld(context)
+        .temperature(2.0F)
+        .downfall(0.0F)
+        .noRain()
+        .grassColor(0xBFB755)
+        .foliageColor(0xAEA42A)
+        .music(SoundEvents.MUSIC_BIOME_DESERT)
+        .spawns(BiomeDefaultFeatures::desertSpawns)
+        .features(BiomeDefaultFeatures::addDesertVegetation)
+        .features(BiomeDefaultFeatures::addDesertExtraDecoration)  // desert wells
+        .particles(ParticleTypes.WHITE_ASH, 0.01F)
+        .build());
+
+context.register(ModBiomes.EMBER_FOREST, BiomeMaker.nether(context)     // nether ores, fire, glowstone...
+        .fogColor(0x6B1E00)
+        .particles(ParticleTypes.CRIMSON_SPORE, 0.025F)
+        .music(SoundEvents.MUSIC_BIOME_CRIMSON_FOREST)
+        .addFeature(GenerationStep.Decoration.VEGETAL_DECORATION, NetherPlacements.CRIMSON_FOREST_VEGETATION)
+        .spawn(EntityType.STRIDER, 60, 1, 2)
+        .build());
+```
+
+### Regions: named values and your own numbers together
+
+Every `ClimatePoints` setting takes names (`Temperature.COLD`), a range of names (`between(a, b)`) or
+plain numbers (`-0.35F, 0.3F`), and you can mix them in one biome:
+
+```java
+BiomeRegion.builder(Identifier.fromNamespaceAndPath("mymod", "highlands"))
+        .overworld()
+        .weight(1.5F)
+        .addBiome(ClimatePoints.builder()
+                .temperature(Temperature.COLD, Temperature.NEUTRAL)                  // names
+                .humidity(-0.35F, 0.3F)                                              // your own numbers
+                .continentalness(Continentalness.between(Continentalness.MID_INLAND, Continentalness.FAR_INLAND))
+                .erosion(Erosion.EROSION_1, Erosion.EROSION_2)                       // hilly
+                .terrain(Terrain.HIGH)
+                .strict(), ModBiomes.HIGHLAND_MEADOW)                                // never outside these ranges
+        .register();
+```
+
+Replacements, your own climate, chances and `exclusive` in one region:
+
+```java
+BiomeRegion.builder(Identifier.fromNamespaceAndPath("mymod", "orchards"))
+        .weight(3)
+        .replace(Biomes.PLAINS, ModBiomes.APPLE_GROVE, 0.6F)          // 60% of this region's patches
+        .replace(Biomes.SUNFLOWER_PLAINS, ModBiomes.APPLE_GROVE)       // every patch
+        .addBiome(ClimatePoints.builder()
+                .temperature(Temperature.WARM)
+                .humidity(Humidity.NEUTRAL)
+                .continentalness(Continentalness.INLAND)
+                .offset(0.2F), ModBiomes.GOLDEN_ORCHARD, 0.5F)          // own climate, in 50% of the patches
+        .exclusive(ModBiomes.APPLE_GROVE, ModBiomes.GOLDEN_ORCHARD)    // never both in one patch
+        .register();
+```
+
+A rare cave biome (only underground, vanilla stays on the surface):
+
+```java
+BiomeRegion.builder(Identifier.fromNamespaceAndPath("mymod", "crystals"))
+        .weight(0.25F)                                                 // 1 patch for every 40 vanilla patches
+        .addBiome(ClimatePoints.builder()
+                .humidity(Humidity.WET, Humidity.HUMID)
+                .depth(Depth.UNDERGROUND), ModBiomes.CRYSTAL_CAVES)
+        .register();
+```
+
+### Replacing biomes and changing how often they appear
+
+```java
+// Your biomes: part of the area / some worlds
+BiomeReplacements.replace(Biomes.FOREST, ModBiomes.APPLE_FOREST, 0.25F);          // 25% of all forests
+BiomeReplacements.replace(Biomes.FLOWER_FOREST, ModBiomes.APPLE_FOREST, 0.1F);    // same biome, other source
+BiomeReplacements.replaceWholeBiome(Biomes.LUSH_CAVES, ModBiomes.CRYSTAL_CAVES, 0.3F); // 30% of worlds
+
+// Only vanilla biomes (no biome of your own needed)
+BiomeReplacements.replace(Biomes.DESERT, Biomes.SAVANNA, 0.3F);                   // desert: 30% savanna,
+BiomeReplacements.replace(Biomes.DESERT, Biomes.BADLANDS, 0.1F);                  //   10% badlands, 60% desert
+BiomeReplacements.replace(Biomes.FOREST, Biomes.BIRCH_FOREST, 0.2F);              // more birch forest
+BiomeReplacements.replace(Biomes.PLAINS, Biomes.SUNFLOWER_PLAINS, 0.3F);          // more sunflowers
+BiomeReplacements.replaceWholeBiome(Biomes.MUSHROOM_FIELDS, Biomes.DEEP_OCEAN, 1.0F); // never mushroom islands
+BiomeReplacements.replaceWholeBiome(Biomes.CHERRY_GROVE, Biomes.MEADOW, 0.5F);    // half of worlds: no cherry
+```
+
+The chances for one biome can be split between several replacements, as long as they add up to 1 or less.
+
+### Modpack settings (before a world loads)
+
+```java
+BiomeRegions.setVanillaWeight(6.0F);    // vanilla patches weight (default 10): lower = modded regions more often
+BiomeRegions.setRegionSize(8);          // 4 to 10 (default 7 = about 512 blocks); 8 = about twice as big
+BiomeReplacements.setPatchSize(5);      // 3 to 10 (default 6 = about 256 blocks); smaller = smaller pieces
+```
 
 ## Good to know
 

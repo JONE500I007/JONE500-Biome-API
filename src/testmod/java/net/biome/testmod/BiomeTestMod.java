@@ -56,6 +56,7 @@ public class BiomeTestMod implements ModInitializer {
 		JONE500BiomeAPI.LOGGER.info("[compat-test] biome_test.compat = '{}'", System.getProperty("biome_test.compat", ""));
 		// Registered in "wrong" alphabetical order on purpose: the API must sort them by id.
 		BiomeRegion.builder(MEADOWS)
+				.overworld()
 				.weight(2)
 				.replace(Biomes.MEADOW, MINT_MEADOW)
 				.replace(Biomes.CHERRY_GROVE, AMBER_MEADOW)

@@ -24,6 +24,16 @@ import net.minecraft.world.level.biome.Biome;
  *
  * <p>This also works inside regions, for the places where a region keeps the vanilla biome.
  *
+ * <h2>Only vanilla biomes (no biome of your own)</h2>
+ * The replacement can be a vanilla biome too, so you can change how often vanilla biomes appear:
+ * <pre>{@code
+ * BiomeReplacements.replace(Biomes.DESERT, Biomes.SAVANNA, 0.5F);         // half as much desert, more savanna
+ * BiomeReplacements.replace(Biomes.PLAINS, Biomes.SUNFLOWER_PLAINS, 0.3F); // more sunflower plains
+ * BiomeReplacements.replaceWholeBiome(Biomes.MUSHROOM_FIELDS, Biomes.DEEP_OCEAN, 1.0F); // no mushroom islands
+ * }</pre>
+ * Pick a replacement that fits the place (similar temperature and terrain), e.g. desert to savanna, not
+ * desert to snowy plains.
+ *
  * <h2>Two kinds of replacement</h2>
  * <ul>
  *   <li>{@link #replace} - <b>part of the area</b>: in every world, about X% of that biome's area becomes

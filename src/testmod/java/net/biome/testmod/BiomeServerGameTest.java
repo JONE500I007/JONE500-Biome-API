@@ -305,6 +305,98 @@ public class BiomeServerGameTest {
 		return darkActive;
 	}
 
+	/**
+	 * Feature order rules that the README warns about, checked with vanilla's own sorter (the one that stops a
+	 * world with "Feature order cycle"): a vanilla feature added twice fails, two biomes with the same two
+	 * features in opposite order fail, and the README's "diamond caves" example (empty + own ores) is fine.
+	 */
+	@GameTest(maxTicks = 20)
+	public void featureOrderRules(GameTestHelper ctx) {
+		RegistryAccess registries = ctx.getLevel().registryAccess();
+		var placed = registries.lookupOrThrow(Registries.PLACED_FEATURE);
+		var carvers = registries.lookupOrThrow(Registries.CONFIGURED_CARVER);
+		Biome plains = registries.lookupOrThrow(Registries.BIOME).getValueOrThrow(Biomes.PLAINS);
+
+		Biome doubleDiamonds = net.biome.api.biome.BiomeMaker.overworld(placed, carvers)
+				.addFeature(net.minecraft.world.level.levelgen.GenerationStep.Decoration.UNDERGROUND_ORES,
+						net.minecraft.data.worldgen.placement.OrePlacements.ORE_DIAMOND)
+				.build();
+		ctx.assertTrue(!featureOrderOk(List.of(plains, doubleDiamonds)), Component.literal("a vanilla ore added twice should fail"));
+
+		var step = net.minecraft.world.level.levelgen.GenerationStep.Decoration.VEGETAL_DECORATION;
+		var a = net.minecraft.data.worldgen.placement.VegetationPlacements.PATCH_PUMPKIN;
+		var b = net.minecraft.data.worldgen.placement.VegetationPlacements.PATCH_SUGAR_CANE;
+		Biome ab = net.biome.api.biome.BiomeMaker.empty(placed, carvers).addFeature(step, a).addFeature(step, b).build();
+		Biome ba = net.biome.api.biome.BiomeMaker.empty(placed, carvers).addFeature(step, b).addFeature(step, a).build();
+		ctx.assertTrue(featureOrderOk(List.of(ab)) && featureOrderOk(List.of(ba)), Component.literal("each order alone should be fine"));
+		ctx.assertTrue(!featureOrderOk(List.of(ab, ba)), Component.literal("opposite order in two biomes should fail"));
+
+		var ores = net.minecraft.world.level.levelgen.GenerationStep.Decoration.UNDERGROUND_ORES;
+		Biome diamondCaves = net.biome.api.biome.BiomeMaker.empty(placed, carvers)
+				.vanillaCaves()
+				.vanillaStoneVeins()
+				.addFeature(net.minecraft.world.level.levelgen.GenerationStep.Decoration.LOCAL_MODIFICATIONS,
+						net.minecraft.data.worldgen.placement.CavePlacements.AMETHYST_GEODE)
+				.addFeature(ores, net.minecraft.data.worldgen.placement.OrePlacements.ORE_IRON_UPPER)
+				.addFeature(ores, net.minecraft.data.worldgen.placement.OrePlacements.ORE_IRON_MIDDLE)
+				.addFeature(ores, net.minecraft.data.worldgen.placement.OrePlacements.ORE_DIAMOND)
+				.addFeature(ores, net.minecraft.data.worldgen.placement.OrePlacements.ORE_DIAMOND_LARGE)
+				.addFeature(ores, net.minecraft.data.worldgen.placement.OrePlacements.ORE_DIAMOND_BURIED)
+				.addFeature(ores, net.minecraft.data.worldgen.placement.MiscOverworldPlacements.DISK_CLAY)
+				.build();
+		List<Biome> all = new ArrayList<>();
+		registries.lookupOrThrow(Registries.BIOME).forEach(all::add);
+		all.add(diamondCaves);
+		ctx.assertTrue(featureOrderOk(all), Component.literal("the README's diamond caves example conflicts with a vanilla biome"));
+		ctx.succeed();
+	}
+
+	private static boolean featureOrderOk(List<Biome> biomes) {
+		try {
+			net.minecraft.world.level.biome.FeatureSorter.buildFeaturesPerStep(biomes, b -> b.getGenerationSettings().features(), true);
+			return true;
+		} catch (IllegalStateException e) {
+			JONE500BiomeAPI.LOGGER.info("[test] feature order check failed as expected: {}", e.getMessage().lines().findFirst().orElse(""));
+			return false;
+		}
+	}
+
+	/** Only vanilla biomes: a vanilla biome can replace another one, so vanilla biome rates can be changed. */
+	@GameTest(maxTicks = 20)
+	public void vanillaToVanillaReplacement(GameTestHelper ctx) {
+		RegistryAccess registries = ctx.getLevel().registryAccess();
+		Climate.ParameterList<Holder<Biome>> vanilla = registries.lookupOrThrow(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST)
+				.getOrThrow(MultiNoiseBiomeSourceParameterLists.OVERWORLD).value().parameters();
+		Climate.Sampler sampler = RandomState.create(registries, NoiseGeneratorSettings.OVERWORLD, SEED).sampler();
+		RegionBiomeLookup lookup = RegionBiomeLookup.create(SEED, BiomeRegions.getRegionSize(), BiomeRegions.getVanillaWeight(), List.of(),
+				List.of(new BiomeRegion.Replacement(Biomes.DESERT, Biomes.SAVANNA, 0.5F)), BiomeReplacements.getPatchSize(), List.of(), SEED,
+				vanilla, registries.lookupOrThrow(Registries.BIOME));
+		int desert = 0;
+		int savanna = 0;
+		for (int i = 0; i < 260; i++) {
+			for (int j = 0; j < 260; j++) {
+				int qx = (i - 130) * 24;
+				int qz = (j - 130) * 24;
+				Climate.TargetPoint target = sampler.sample(qx, 16, qz);
+				if (!vanilla.findValue(target).is(Biomes.DESERT)) {
+					continue;
+				}
+				Holder<Biome> result = lookup.getBiome(target, qx, qz, vanilla);
+				if (result.is(Biomes.SAVANNA)) {
+					savanna++;
+				} else {
+					ctx.assertTrue(result.is(Biomes.DESERT), Component.literal("desert became " + result.getRegisteredName()));
+				}
+				desert++;
+			}
+		}
+		double share = (double) savanna / desert;
+		JONE500BiomeAPI.LOGGER.info("[test] vanilla to vanilla: {} of {} desert samples became savanna ({}%)", savanna, desert, Math.round(share * 100));
+		ctx.assertTrue(desert > 300, Component.literal("too few desert samples: " + desert));
+		ctx.assertTrue(Math.abs(share - 0.5) < 0.12, Component.literal("savanna share " + share + ", expected about 0.5"));
+		ctx.succeed();
+	}
+
 	/** BiomeReplacements: about 40% of birch forest becomes blue forest, everywhere (also in vanilla patches). */
 	@GameTest(maxTicks = 20)
 	public void worldWideReplacementFollowsChance(GameTestHelper ctx) {
