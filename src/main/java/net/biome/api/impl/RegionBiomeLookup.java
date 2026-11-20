@@ -36,7 +36,7 @@ public final class RegionBiomeLookup {
 
 	private final RegionLayout layout;
 	private final List<BiomeRegion> regions;
-	private final Climate.ParameterList<Entry>[] trees;
+	private final RegionTrees[] trees;
 	/** For dimensions without climate (the End): per region, original biome -> replacement. */
 	private final Map<ResourceKey<Biome>, Entry>[] replacementMaps;
 	private final RegionLayout replacementLayout;
@@ -45,7 +45,7 @@ public final class RegionBiomeLookup {
 	private final Map<ResourceKey<Biome>, Holder<Biome>> wholeBiomeSwaps;
 	private final Set<Holder<Biome>> addedBiomes;
 
-	private RegionBiomeLookup(RegionLayout layout, List<BiomeRegion> regions, Climate.ParameterList<Entry>[] trees,
+	private RegionBiomeLookup(RegionLayout layout, List<BiomeRegion> regions, RegionTrees[] trees,
 			Map<ResourceKey<Biome>, Entry>[] replacementMaps, RegionLayout replacementLayout, Map<ResourceKey<Biome>, GlobalReplacement> globalReplacements,
 			Map<ResourceKey<Biome>, WeightedPick> globalWeighted, Map<ResourceKey<Biome>, Holder<Biome>> wholeBiomeSwaps, Set<Holder<Biome>> addedBiomes) {
 		this.layout = layout;
@@ -124,7 +124,7 @@ public final class RegionBiomeLookup {
 		}
 		RegionLayout layout = new RegionLayout(seed, regionSize, vanillaWeight, weights);
 
-		Climate.ParameterList<Entry>[] trees = new Climate.ParameterList[regions.size()];
+		RegionTrees[] trees = new RegionTrees[regions.size()];
 		Map<ResourceKey<Biome>, Entry>[] replacementMaps = new Map[regions.size()];
 		Set<Holder<Biome>> added = new LinkedHashSet<>();
 
@@ -188,7 +188,7 @@ public final class RegionBiomeLookup {
 				Map.copyOf(globalWeighted), Map.copyOf(whole), Collections.unmodifiableSet(added));
 	}
 
-	private static Climate.ParameterList<Entry> buildRegionTree(long seed, BiomeRegion region, Climate.ParameterList<Holder<Biome>> original,
+	private static RegionTrees buildRegionTree(long seed, BiomeRegion region, Climate.ParameterList<Holder<Biome>> original,
 			HolderGetter<Biome> biomes, Set<Holder<Biome>> added) {
 		String regionId = region.getId().toString();
 		Map<ResourceKey<Biome>, int[]> groupOf = new HashMap<>();
@@ -237,24 +237,24 @@ public final class RegionBiomeLookup {
 		return replacementFor;
 	}
 
-	private static Climate.ParameterList<Entry> buildRegionTree(BiomeRegion region, String regionId, Climate.ParameterList<Holder<Biome>> original,
+	/**
+	 * Two trees per region: the dimension's own points (same points, same order as vanilla, only relabeled, so the
+	 * search behaves exactly like vanilla's) and the region's extra points. The extra point wins when it is at
+	 * least as close (see {@link #regionBiome}). Comparing the real distances keeps vanilla's own choices unchanged;
+	 * the old way (a bigger offset on every vanilla point) changed vanilla's order and could create exact ties that
+	 * vanilla's search answers differently on different threads.
+	 */
+	private static RegionTrees buildRegionTree(BiomeRegion region, String regionId, Climate.ParameterList<Holder<Biome>> original,
 			HolderGetter<Biome> biomes, Set<Holder<Biome>> added, Map<ResourceKey<Biome>, Entry> replacementFor,
 			Map<ResourceKey<Biome>, int[]> groupOf, Map<ResourceKey<Biome>, Long> groupSaltOf) {
-		List<Pair<Climate.ParameterPoint, Entry>> points = new ArrayList<>(original.values().size() + region.getExtraPoints().size());
-		// Extra points usually overlap vanilla points exactly (distance 0 for both). Give the original points
-		// the smallest possible extra offset so the region's own points win those ties.
-		boolean hasExtraPoints = !region.getExtraPoints().isEmpty();
+		List<Pair<Climate.ParameterPoint, Hit>> points = new ArrayList<>(original.values().size());
 		for (Pair<Climate.ParameterPoint, Holder<Biome>> pair : original.values()) {
 			Holder<Biome> originalBiome = pair.getSecond();
 			Entry template = originalBiome.unwrapKey().map(replacementFor::get).orElse(null);
 			Entry entry = template == null ? Entry.original(originalBiome) : template.withOriginal(originalBiome);
-			Climate.ParameterPoint point = pair.getFirst();
-			if (hasExtraPoints) {
-				point = new Climate.ParameterPoint(point.temperature(), point.humidity(), point.continentalness(), point.erosion(),
-						point.depth(), point.weirdness(), point.offset() + 1L);
-			}
-			points.add(Pair.of(point, entry));
+			points.add(Pair.of(pair.getFirst(), new Hit(pair.getFirst(), entry)));
 		}
+		List<Pair<Climate.ParameterPoint, Hit>> extras = new ArrayList<>(region.getExtraPoints().size());
 		for (BiomeRegion.ExtraPoint extra : region.getExtraPoints()) {
 			Optional<Holder.Reference<Biome>> holder = biomes.get(extra.biome());
 			if (holder.isEmpty()) {
@@ -262,11 +262,30 @@ public final class RegionBiomeLookup {
 						regionId, extra.biome().identifier());
 				continue;
 			}
-			points.add(Pair.of(extra.point(), newEntry(holder.get(), null, extra.strict() ? extra.point() : null,
-					extra.chance(), regionId, extra.biome(), groupOf, groupSaltOf)));
+			extras.add(Pair.of(extra.point(), new Hit(extra.point(), newEntry(holder.get(), null, extra.strict() ? extra.point() : null,
+					extra.chance(), regionId, extra.biome(), groupOf, groupSaltOf))));
 			added.add(holder.get());
 		}
-		return new Climate.ParameterList<>(points);
+		return new RegionTrees(new Climate.ParameterList<>(points), extras.isEmpty() ? null : new Climate.ParameterList<>(extras));
+	}
+
+	/** A point of a region tree and what it means. */
+	record Hit(Climate.ParameterPoint point, Entry entry) {
+	}
+
+	/** The relabeled dimension points and the region's extra points (null if none). */
+	record RegionTrees(Climate.ParameterList<Hit> original, Climate.@Nullable ParameterList<Hit> extras) {
+	}
+
+	/** Same as vanilla's (private) ParameterPoint.fitness: squared distance of the target to the point. */
+	static long fitness(Climate.ParameterPoint p, Climate.TargetPoint t) {
+		return square(p.temperature().distance(t.temperature())) + square(p.humidity().distance(t.humidity()))
+				+ square(p.continentalness().distance(t.continentalness())) + square(p.erosion().distance(t.erosion()))
+				+ square(p.depth().distance(t.depth())) + square(p.weirdness().distance(t.weirdness())) + square(p.offset());
+	}
+
+	private static long square(long v) {
+		return v * v;
 	}
 
 	private static Entry newEntry(Holder<Biome> biome, @Nullable Holder<Biome> original, Climate.@Nullable ParameterPoint strictBox,
@@ -293,7 +312,20 @@ public final class RegionBiomeLookup {
 		if (cell.region() == RegionLayout.VANILLA) {
 			return vanilla.findValue(target);
 		}
-		Entry entry = trees[cell.region()].findValue(target);
+		RegionTrees regionTrees = trees[cell.region()];
+		Hit hit = regionTrees.original().findValue(target);
+		if (regionTrees.extras() != null) {
+			Hit extraHit = regionTrees.extras().findValue(target);
+			// The region's own point wins when it is at least as close as the dimension's point.
+			if (fitness(extraHit.point(), target) <= fitness(hit.point(), target)) {
+				Entry extra = extraHit.entry();
+				if (isEnabled(extra, cell) && (extra.strictBox == null || isInside(extra.strictBox, target))) {
+					return extra.pick == null ? extra.biome : extra.pick.pick(hit.entry().original, quartX, quartZ);
+				}
+				// not in this patch (chance / exclusive) or outside its strict ranges: the dimension's point counts
+			}
+		}
+		Entry entry = hit.entry();
 		if (entry.biome == null) {
 			return entry.original;
 		}
