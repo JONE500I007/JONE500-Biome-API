@@ -1,5 +1,7 @@
 {
   "values": [
-    "biome_test:ember_forest"
+    "biome_test:ember_forest",
+    "biome_test:sulfur_wastes",
+    "biome_test:bone_fields"
   ]
 }

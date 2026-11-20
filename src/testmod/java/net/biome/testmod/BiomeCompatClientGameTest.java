@@ -206,6 +206,18 @@ public class BiomeCompatClientGameTest implements FabricClientGameTest {
 			}
 		}
 		expect(smallIslands == 0, "end: small_end_islands fully replaced (" + smallIslands + " left)");
+		BlockPos ash = find(end, BiomeTestMod.ASH_BARRENS, 64);
+		if (ash != null) {
+			int basalt = 0;
+			for (BlockPos pos : BlockPos.betweenClosed(ash.offset(-24, -40, -24), ash.offset(24, 40, 24))) {
+				if (end.getBlockState(pos).is(Blocks.SMOOTH_BASALT) && end.getBiome(pos).is(BiomeTestMod.ASH_BARRENS)) {
+					basalt++;
+				}
+			}
+			expect(basalt > 10, "end: ash_barrens surface rule (" + basalt + " smooth basalt blocks)");
+		} else {
+			info("end: no ash_barrens found near the sample point");
+		}
 
 		// 5. Generate some far-away chunks in every dimension (features, structures, surface)
 		int chunks = 0;

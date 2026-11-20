@@ -14,7 +14,7 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Climate;
 
 /**
- * A region of the Overworld that uses its own biomes.
+ * A region of the Overworld, the Nether or the End that uses its own biomes.
  *
  * <p>The world is split into large patches ("region instances"). Each patch is either vanilla or one
  * of the registered regions, picked by weight. Inside a patch of your region, the climate works
@@ -36,6 +36,7 @@ public final class BiomeRegion {
 	private final RegionDimension dimension;
 	private final float weight;
 	private final List<Replacement> replacements;
+	private final List<WeightedReplacement> weightedReplacements;
 	private final List<ExtraPoint> extraPoints;
 	private final List<List<ResourceKey<Biome>>> exclusiveGroups;
 
@@ -44,6 +45,7 @@ public final class BiomeRegion {
 		this.dimension = b.dimension;
 		this.weight = b.weight;
 		this.replacements = List.copyOf(b.replacements.values());
+		this.weightedReplacements = List.copyOf(b.weightedReplacements.values());
 		this.extraPoints = List.copyOf(b.extraPoints);
 		this.exclusiveGroups = b.exclusiveGroups.stream().map(List::copyOf).toList();
 	}
@@ -72,6 +74,20 @@ public final class BiomeRegion {
 		return replacements;
 	}
 
+	/** The biomes this region replaces with several biomes by weight, in the order they were added. */
+	public List<WeightedReplacement> getWeightedReplacements() {
+		return weightedReplacements;
+	}
+
+	/** Every biome this region can place (single and weighted replacements, extra points). */
+	public List<ResourceKey<Biome>> getAllBiomes() {
+		List<ResourceKey<Biome>> all = new ArrayList<>();
+		replacements.forEach(r -> all.add(r.biome()));
+		weightedReplacements.forEach(w -> w.biomes().getEntries().forEach(e -> all.add(e.biome())));
+		extraPoints.forEach(p -> all.add(p.biome()));
+		return all;
+	}
+
 	/** Extra climate points added by {@link Builder#addBiome}. */
 	public List<ExtraPoint> getExtraPoints() {
 		return extraPoints;
@@ -97,6 +113,14 @@ public final class BiomeRegion {
 	}
 
 	/**
+	 * A biome that becomes one of several biomes (by weight) inside this region.
+	 *
+	 * @param chance 0..1, in how many patches of this region the replacement happens
+	 */
+	public record WeightedReplacement(ResourceKey<Biome> original, WeightedBiomes biomes, float chance) {
+	}
+
+	/**
 	 * A climate point added only inside this region.
 	 *
 	 * @param chance 0..1, in how many patches of this region the point is used. In the other patches the
@@ -112,6 +136,7 @@ public final class BiomeRegion {
 		private float weight = 1.0F;
 		private RegionDimension dimension = RegionDimension.OVERWORLD;
 		private final Map<ResourceKey<Biome>, Replacement> replacements = new LinkedHashMap<>();
+		private final Map<ResourceKey<Biome>, WeightedReplacement> weightedReplacements = new LinkedHashMap<>();
 		private final List<ExtraPoint> extraPoints = new ArrayList<>();
 		private final List<List<ResourceKey<Biome>>> exclusiveGroups = new ArrayList<>();
 
@@ -136,6 +161,18 @@ public final class BiomeRegion {
 		 */
 		public Builder nether() {
 			this.dimension = RegionDimension.NETHER;
+			return this;
+		}
+
+		/**
+		 * Makes this an <b>End</b> region. The End has no climate (vanilla picks the main island, highlands,
+		 * midlands, barrens or small islands from the terrain), so an End region can only <b>replace</b> those
+		 * biomes inside its patches: {@code .replace(Biomes.END_HIGHLANDS, ModBiomes.VOID_FOREST)}. Weights,
+		 * chances and {@link #exclusive} work like in the Overworld; {@code addBiome(...)} can't be used.
+		 * Biomes placed with Fabric API's {@code TheEndBiomes} can be replaced too.
+		 */
+		public Builder end() {
+			this.dimension = RegionDimension.END;
 			return this;
 		}
 
@@ -167,10 +204,36 @@ public final class BiomeRegion {
 			Objects.requireNonNull(original, "original");
 			Objects.requireNonNull(biome, "biome");
 			checkChance(chance);
-			if (replacements.containsKey(original)) {
+			if (replacements.containsKey(original) || weightedReplacements.containsKey(original)) {
 				throw new IllegalStateException("Region " + id + " already replaces " + original.identifier());
 			}
 			replacements.put(original, new Replacement(original, biome, chance));
+			return this;
+		}
+
+		/**
+		 * Inside this region, {@code original} becomes <b>one of several biomes, picked by weight</b> (in small
+		 * cells, see {@link WeightedBiomes}). Works in every dimension, also the Nether and the End:
+		 * <pre>{@code
+		 * .replace(Biomes.END_HIGHLANDS, WeightedBiomes.builder()
+		 *         .add(ModBiomes.CRYSTAL_SPIRES, 3)
+		 *         .add(ModBiomes.VOID_FOREST, 1)
+		 *         .build())
+		 * }</pre>
+		 */
+		public Builder replace(ResourceKey<Biome> original, WeightedBiomes biomes) {
+			return replace(original, biomes, 1.0F);
+		}
+
+		/** Like {@link #replace(ResourceKey, WeightedBiomes)}, but only in {@code chance} of this region's patches. */
+		public Builder replace(ResourceKey<Biome> original, WeightedBiomes biomes, float chance) {
+			Objects.requireNonNull(original, "original");
+			Objects.requireNonNull(biomes, "biomes");
+			checkChance(chance);
+			if (replacements.containsKey(original) || weightedReplacements.containsKey(original)) {
+				throw new IllegalStateException("Region " + id + " already replaces " + original.identifier());
+			}
+			weightedReplacements.put(original, new WeightedReplacement(original, biomes, chance));
 			return this;
 		}
 
@@ -249,16 +312,23 @@ public final class BiomeRegion {
 
 		/** Builds the region without registering it. */
 		public BiomeRegion build() {
-			if (replacements.isEmpty() && extraPoints.isEmpty()) {
+			if (replacements.isEmpty() && weightedReplacements.isEmpty() && extraPoints.isEmpty()) {
 				throw new IllegalStateException("Region " + id + " has no biomes: use replace(...) or addBiome(...)");
+			}
+			if (dimension == RegionDimension.END && !extraPoints.isEmpty()) {
+				throw new IllegalStateException("Region " + id + ": addBiome(...) can't be used in the End (it has no climate). "
+						+ "Use replace(...), e.g. replace(Biomes.END_HIGHLANDS, yourBiome)");
 			}
 			for (List<ResourceKey<Biome>> group : exclusiveGroups) {
 				for (ResourceKey<Biome> biome : group) {
 					boolean used = replacements.values().stream().anyMatch(r -> r.biome().equals(biome))
 							|| extraPoints.stream().anyMatch(p -> p.biome().equals(biome));
 					if (!used) {
+						boolean weighted = weightedReplacements.values().stream()
+								.anyMatch(w -> w.biomes().getEntries().stream().anyMatch(e -> e.biome().equals(biome)));
 						throw new IllegalStateException("Region " + id + ": exclusive biome " + biome.identifier()
-								+ " is not used by replace(...) or addBiome(...) in this region");
+								+ (weighted ? " is part of WeightedBiomes; exclusive(...) only works with single replace(...) and addBiome(...) biomes"
+										: " is not used by replace(...) or addBiome(...) in this region"));
 					}
 				}
 			}

@@ -321,7 +321,11 @@ public class BiomeServerGameTest {
 				.addFeature(net.minecraft.world.level.levelgen.GenerationStep.Decoration.UNDERGROUND_ORES,
 						net.minecraft.data.worldgen.placement.OrePlacements.ORE_DIAMOND)
 				.build();
-		ctx.assertTrue(!featureOrderOk(List.of(plains, doubleDiamonds)), Component.literal("a vanilla ore added twice should fail"));
+		// Biolith changes vanilla's feature sorter (MixinFeatureSorter), so the "must fail" checks only hold without it.
+		boolean vanillaSorter = !net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("biolith");
+		if (vanillaSorter) {
+			ctx.assertTrue(!featureOrderOk(List.of(plains, doubleDiamonds)), Component.literal("a vanilla ore added twice should fail"));
+		}
 
 		var step = net.minecraft.world.level.levelgen.GenerationStep.Decoration.VEGETAL_DECORATION;
 		var a = net.minecraft.data.worldgen.placement.VegetationPlacements.PATCH_PUMPKIN;
@@ -329,7 +333,9 @@ public class BiomeServerGameTest {
 		Biome ab = net.biome.api.biome.BiomeMaker.empty(placed, carvers).addFeature(step, a).addFeature(step, b).build();
 		Biome ba = net.biome.api.biome.BiomeMaker.empty(placed, carvers).addFeature(step, b).addFeature(step, a).build();
 		ctx.assertTrue(featureOrderOk(List.of(ab)) && featureOrderOk(List.of(ba)), Component.literal("each order alone should be fine"));
-		ctx.assertTrue(!featureOrderOk(List.of(ab, ba)), Component.literal("opposite order in two biomes should fail"));
+		if (vanillaSorter) {
+			ctx.assertTrue(!featureOrderOk(List.of(ab, ba)), Component.literal("opposite order in two biomes should fail"));
+		}
 
 		var ores = net.minecraft.world.level.levelgen.GenerationStep.Decoration.UNDERGROUND_ORES;
 		Biome diamondCaves = net.biome.api.biome.BiomeMaker.empty(placed, carvers)
@@ -359,6 +365,46 @@ public class BiomeServerGameTest {
 			JONE500BiomeAPI.LOGGER.info("[test] feature order check failed as expected: {}", e.getMessage().lines().findFirst().orElse(""));
 			return false;
 		}
+	}
+
+	/** A modded biome (red plains, placed by a region) can be replaced too, by another modded biome. */
+	@GameTest(maxTicks = 20)
+	public void replaceOwnModdedBiome(GameTestHelper ctx) {
+		RegistryAccess registries = ctx.getLevel().registryAccess();
+		Climate.ParameterList<Holder<Biome>> vanilla = registries.lookupOrThrow(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST)
+				.getOrThrow(MultiNoiseBiomeSourceParameterLists.OVERWORLD).value().parameters();
+		Climate.Sampler sampler = RandomState.create(registries, NoiseGeneratorSettings.OVERWORLD, SEED).sampler();
+		List<BiomeRegion.Replacement> replacements = List.of(new BiomeRegion.Replacement(BiomeTestMod.RED_PLAINS, BiomeTestMod.ORANGE_HILLS, 0.5F));
+		RegionBiomeLookup without = RegionBiomeLookup.create(SEED, BiomeRegions.getRegionSize(), BiomeRegions.getVanillaWeight(),
+				new ArrayList<>(BiomeRegions.getAll(RegionDimension.OVERWORLD)), List.of(), BiomeReplacements.getPatchSize(), List.of(), SEED,
+				vanilla, registries.lookupOrThrow(Registries.BIOME));
+		RegionBiomeLookup with = RegionBiomeLookup.create(SEED, BiomeRegions.getRegionSize(), BiomeRegions.getVanillaWeight(),
+				new ArrayList<>(BiomeRegions.getAll(RegionDimension.OVERWORLD)), replacements, BiomeReplacements.getPatchSize(), List.of(), SEED,
+				vanilla, registries.lookupOrThrow(Registries.BIOME));
+		int red = 0;
+		int replaced = 0;
+		for (int i = 0; i < 260; i++) {
+			for (int j = 0; j < 260; j++) {
+				int qx = (i - 130) * 24;
+				int qz = (j - 130) * 24;
+				Climate.TargetPoint target = sampler.sample(qx, 16, qz);
+				if (!without.getBiome(target, qx, qz, vanilla).is(BiomeTestMod.RED_PLAINS)) {
+					continue;
+				}
+				Holder<Biome> result = with.getBiome(target, qx, qz, vanilla);
+				if (result.is(BiomeTestMod.ORANGE_HILLS)) {
+					replaced++;
+				} else {
+					ctx.assertTrue(result.is(BiomeTestMod.RED_PLAINS), Component.literal("red plains became " + result.getRegisteredName()));
+				}
+				red++;
+			}
+		}
+		double share = (double) replaced / red;
+		JONE500BiomeAPI.LOGGER.info("[test] own modded biome: {} of {} red plains samples became orange hills ({}%)", replaced, red, Math.round(share * 100));
+		ctx.assertTrue(red > 200, Component.literal("too few red plains samples: " + red));
+		ctx.assertTrue(Math.abs(share - 0.5) < 0.15, Component.literal("replaced share " + share + ", expected about 0.5"));
+		ctx.succeed();
 	}
 
 	/** Only vanilla biomes: a vanilla biome can replace another one, so vanilla biome rates can be changed. */
@@ -392,7 +438,7 @@ public class BiomeServerGameTest {
 		}
 		double share = (double) savanna / desert;
 		JONE500BiomeAPI.LOGGER.info("[test] vanilla to vanilla: {} of {} desert samples became savanna ({}%)", savanna, desert, Math.round(share * 100));
-		ctx.assertTrue(desert > 300, Component.literal("too few desert samples: " + desert));
+		ctx.assertTrue(desert > (OTHER_WORLDGEN_MODS ? 100 : 300), Component.literal("too few desert samples: " + desert));
 		ctx.assertTrue(Math.abs(share - 0.5) < 0.12, Component.literal("savanna share " + share + ", expected about 0.5"));
 		ctx.succeed();
 	}
@@ -540,6 +586,270 @@ public class BiomeServerGameTest {
 				Component.literal("small end islands still appear " + counts.get(Biomes.SMALL_END_ISLANDS) + " times"));
 		ctx.assertTrue(counts.getOrDefault(BiomeTestMod.VOID_MEADOW, 0) > 0, Component.literal("void meadow never appeared in the End"));
 		ctx.assertTrue(counts.getOrDefault(Biomes.END_HIGHLANDS, 0) > 0, Component.literal("vanilla end highlands disappeared"));
+		ctx.succeed();
+	}
+
+	/**
+	 * End region on the server's real End: inside "ashlands" patches every end barrens is ash barrens (and some
+	 * midlands); outside them vanilla stays. addBiome(...) is refused for End regions.
+	 */
+	@GameTest(maxTicks = 20)
+	public void endRegionWorks(GameTestHelper ctx) {
+		ServerLevel end = ctx.getLevel().getServer().getLevel(Level.END);
+		ctx.assertTrue(end != null, Component.literal("no End level"));
+		BiomeSource source = end.getChunkSource().getGenerator().getBiomeSource();
+		RegionBiomeLookup lookup = apiSource(source).jone500$getLookup();
+		ctx.assertTrue(lookup != null, Component.literal("the End got no region lookup"));
+		Climate.Sampler sampler = end.getChunkSource().randomState().sampler();
+		int ash = 0;
+		int ashOutside = 0;
+		int barrensInside = 0;
+		int barrensOutside = 0;
+		int midlandsInside = 0;
+		int regionSamples = 0;
+		for (int i = 0; i < 160; i++) {
+			for (int j = 0; j < 160; j++) {
+				int qx = 400 + i * 32; // far from the main island
+				int qz = (j - 80) * 32;
+				Holder<Biome> biome = source.getNoiseBiome(qx, 16, qz, sampler);
+				BiomeRegion region = lookup.getRegionAt(qx, qz);
+				boolean inside = region != null && region.getId().equals(BiomeTestMod.ASHLANDS);
+				if (inside) regionSamples++;
+				if (biome.is(BiomeTestMod.ASH_BARRENS)) {
+					ash++;
+					if (!inside) ashOutside++;
+				}
+				if (biome.is(Biomes.END_BARRENS)) {
+					if (inside) barrensInside++;
+					else barrensOutside++;
+				}
+				if (inside && biome.is(Biomes.END_MIDLANDS)) midlandsInside++;
+			}
+		}
+		JONE500BiomeAPI.LOGGER.info("[test] end region: samples in region={}, ash={}, ash outside={}, barrens inside={}, barrens outside={}, midlands inside={}",
+				regionSamples, ash, ashOutside, barrensInside, barrensOutside, midlandsInside);
+		ctx.assertTrue(regionSamples > 0, Component.literal("the ashlands region never appeared"));
+		ctx.assertTrue(ash > 0, Component.literal("ash barrens never appeared"));
+		ctx.assertTrue(ashOutside == 0, Component.literal("ash barrens outside its region " + ashOutside + " times"));
+		ctx.assertTrue(barrensInside == 0, Component.literal("end barrens left inside the region " + barrensInside + " times"));
+		ctx.assertTrue(barrensOutside > 0, Component.literal("vanilla end barrens disappeared outside the region"));
+		ctx.assertTrue(source.possibleBiomes().stream().anyMatch(b -> b.is(BiomeTestMod.ASH_BARRENS)),
+				Component.literal("ash barrens is not a possible End biome"));
+		List<String> debug = new ArrayList<>();
+		source.addDebugInfo(debug, new net.minecraft.core.BlockPos(2000, 60, 0), sampler);
+		ctx.assertTrue(debug.stream().anyMatch(s -> s.startsWith("Biome API region: ")), Component.literal("no F3 region line in the End: " + debug));
+
+		boolean refused;
+		try {
+			BiomeRegion.builder(BiomeTestMod.id("end_climate")).end()
+					.addBiome(ClimatePoints.builder().temperature(Temperature.WARM), BiomeTestMod.ASH_BARRENS).build();
+			refused = false;
+		} catch (IllegalStateException e) {
+			refused = true;
+		}
+		ctx.assertTrue(refused, Component.literal("addBiome(...) should be refused in an End region"));
+		ctx.succeed();
+	}
+
+	/**
+	 * End surface rule on the server's real End: the top block of ash barrens is smooth basalt (our rule),
+	 * vanilla end barrens keep end stone (vanilla's rule still runs after ours).
+	 */
+	@GameTest(maxTicks = 400)
+	public void endSurfaceRuleWorks(GameTestHelper ctx) {
+		ServerLevel end = ctx.getLevel().getServer().getLevel(Level.END);
+		ctx.assertTrue(end != null, Component.literal("no End level"));
+		BiomeSource source = end.getChunkSource().getGenerator().getBiomeSource();
+		Climate.Sampler sampler = end.getChunkSource().randomState().sampler();
+		Map<String, Integer> ashTops = new HashMap<>();
+		Map<String, Integer> barrensTops = new HashMap<>();
+		int checkedChunks = 0;
+		for (int i = 0; i < 80 && checkedChunks < 24; i++) {
+			for (int j = 0; j < 80 && checkedChunks < 24; j++) {
+				int qx = 400 + i * 32;
+				int qz = (j - 40) * 32;
+				Holder<Biome> biome = source.getNoiseBiome(qx, 16, qz, sampler);
+				boolean ash = biome.is(BiomeTestMod.ASH_BARRENS);
+				if (!ash && !(biome.is(Biomes.END_BARRENS) && barrensTops.values().stream().mapToInt(Integer::intValue).sum() < 200)) {
+					continue;
+				}
+				int bx = qx << 2;
+				int bz = qz << 2;
+				net.minecraft.world.level.chunk.ChunkAccess chunk = end.getChunk(bx >> 4, bz >> 4);
+				checkedChunks++;
+				for (int dx = 0; dx < 16; dx++) {
+					for (int dz = 0; dz < 16; dz++) {
+						int x = (bx & ~15) + dx;
+						int z = (bz & ~15) + dz;
+						int top = chunk.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE_WG, x & 15, z & 15);
+						if (top <= end.getMinY()) {
+							continue; // void: no island here
+						}
+						net.minecraft.core.BlockPos pos = new net.minecraft.core.BlockPos(x, top, z);
+						Holder<Biome> here = end.getBiome(pos);
+						String block = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(chunk.getBlockState(pos).getBlock()).getPath();
+						if (here.is(BiomeTestMod.ASH_BARRENS)) ashTops.merge(block, 1, Integer::sum);
+						else if (here.is(Biomes.END_BARRENS)) barrensTops.merge(block, 1, Integer::sum);
+					}
+				}
+			}
+		}
+		JONE500BiomeAPI.LOGGER.info("[test] end surface: ash barrens tops {}, end barrens tops {}", ashTops, barrensTops);
+		int ashTotal = ashTops.values().stream().mapToInt(Integer::intValue).sum();
+		int barrensTotal = barrensTops.values().stream().mapToInt(Integer::intValue).sum();
+		ctx.assertTrue(ashTotal > 50, Component.literal("too few ash barrens columns with ground: " + ashTotal));
+		ctx.assertTrue(ashTops.getOrDefault("smooth_basalt", 0) > ashTotal * 0.9,
+				Component.literal("ash barrens ground should be smooth basalt: " + ashTops));
+		ctx.assertTrue(barrensTotal == 0 || barrensTops.getOrDefault("end_stone", 0) > barrensTotal * 0.9,
+				Component.literal("vanilla end barrens ground should stay end stone: " + barrensTops));
+		ctx.succeed();
+	}
+
+	/** WeightedBiomes in an Overworld region: plains become red plains / blue forest / orange hills about 5 : 3 : 1. */
+	@GameTest(maxTicks = 20)
+	public void weightedRegionFollowsWeights(GameTestHelper ctx) {
+		RegistryAccess registries = ctx.getLevel().registryAccess();
+		Climate.ParameterList<Holder<Biome>> vanilla = registries.lookupOrThrow(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST)
+				.getOrThrow(MultiNoiseBiomeSourceParameterLists.OVERWORLD).value().parameters();
+		Climate.Sampler sampler = RandomState.create(registries, NoiseGeneratorSettings.OVERWORLD, SEED).sampler();
+		BiomeRegion region = BiomeRegion.builder(BiomeTestMod.id("weighted_test"))
+				.replace(Biomes.PLAINS, net.biome.api.region.WeightedBiomes.builder()
+						.add(BiomeTestMod.RED_PLAINS, 5)
+						.add(BiomeTestMod.BLUE_FOREST, 3)
+						.add(BiomeTestMod.ORANGE_HILLS, 1)
+						.size(4)
+						.build())
+				.build();
+		// vanilla weight 0: the whole world is this region
+		RegionBiomeLookup lookup = RegionBiomeLookup.create(SEED, 7, 0.0F, List.of(region), vanilla, registries.lookupOrThrow(Registries.BIOME));
+		Map<ResourceKey<Biome>, Integer> counts = new HashMap<>();
+		int plains = 0;
+		for (int i = 0; i < 300; i++) {
+			for (int j = 0; j < 300; j++) {
+				int qx = (i - 150) * 20;
+				int qz = (j - 150) * 20;
+				Climate.TargetPoint target = sampler.sample(qx, 16, qz);
+				if (!vanilla.findValue(target).is(Biomes.PLAINS)) {
+					continue;
+				}
+				plains++;
+				counts.merge(lookup.getBiome(target, qx, qz, vanilla).unwrapKey().orElseThrow(), 1, Integer::sum);
+			}
+		}
+		JONE500BiomeAPI.LOGGER.info("[test] weighted region over {} plains samples: {}", plains, counts);
+		ctx.assertTrue(plains > (OTHER_WORLDGEN_MODS ? 300 : 2000), Component.literal("too few plains samples: " + plains));
+		ctx.assertTrue(counts.getOrDefault(Biomes.PLAINS, 0) == 0, Component.literal("plains left inside the region: " + counts));
+		checkShare(ctx, "red plains", counts.getOrDefault(BiomeTestMod.RED_PLAINS, 0), plains, 5.0 / 9.0);
+		checkShare(ctx, "blue forest", counts.getOrDefault(BiomeTestMod.BLUE_FOREST, 0), plains, 3.0 / 9.0);
+		checkShare(ctx, "orange hills", counts.getOrDefault(BiomeTestMod.ORANGE_HILLS, 0), plains, 1.0 / 9.0);
+		ctx.succeed();
+	}
+
+	/** World-wide WeightedBiomes with keepOriginal: desert becomes savanna / badlands / stays desert about 1 : 1 : 2. */
+	@GameTest(maxTicks = 20)
+	public void weightedWorldWideKeepsOriginal(GameTestHelper ctx) {
+		RegistryAccess registries = ctx.getLevel().registryAccess();
+		Climate.ParameterList<Holder<Biome>> vanilla = registries.lookupOrThrow(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST)
+				.getOrThrow(MultiNoiseBiomeSourceParameterLists.OVERWORLD).value().parameters();
+		Climate.Sampler sampler = RandomState.create(registries, NoiseGeneratorSettings.OVERWORLD, SEED).sampler();
+		net.biome.api.region.WeightedBiomes weighted = net.biome.api.region.WeightedBiomes.builder()
+				.add(Biomes.SAVANNA, 1)
+				.add(Biomes.BADLANDS, 1)
+				.keepOriginal(2)
+				.size(4)
+				.build();
+		RegionBiomeLookup lookup = RegionBiomeLookup.create(SEED, 7, 10.0F, List.of(), List.of(),
+				List.of(new BiomeRegion.WeightedReplacement(Biomes.DESERT, weighted, 1.0F)), 6, List.of(), SEED, vanilla,
+				registries.lookupOrThrow(Registries.BIOME));
+		Map<ResourceKey<Biome>, Integer> counts = new HashMap<>();
+		int desert = 0;
+		for (int i = 0; i < 300; i++) {
+			for (int j = 0; j < 300; j++) {
+				int qx = (i - 150) * 20;
+				int qz = (j - 150) * 20;
+				Climate.TargetPoint target = sampler.sample(qx, 16, qz);
+				if (!vanilla.findValue(target).is(Biomes.DESERT)) {
+					continue;
+				}
+				desert++;
+				counts.merge(lookup.getBiome(target, qx, qz, vanilla).unwrapKey().orElseThrow(), 1, Integer::sum);
+			}
+		}
+		JONE500BiomeAPI.LOGGER.info("[test] weighted world-wide over {} desert samples: {}", desert, counts);
+		ctx.assertTrue(desert > (OTHER_WORLDGEN_MODS ? 150 : 1000), Component.literal("too few desert samples: " + desert));
+		checkShare(ctx, "savanna", counts.getOrDefault(Biomes.SAVANNA, 0), desert, 0.25);
+		checkShare(ctx, "badlands", counts.getOrDefault(Biomes.BADLANDS, 0), desert, 0.25);
+		checkShare(ctx, "desert kept", counts.getOrDefault(Biomes.DESERT, 0), desert, 0.5);
+		ctx.succeed();
+	}
+
+	/** WeightedBiomes in an End region (no climate): end highlands become void meadow / ash barrens about 1 : 3. */
+	@GameTest(maxTicks = 20)
+	public void weightedEndRegion(GameTestHelper ctx) {
+		var biomeLookup = ctx.getLevel().registryAccess().lookupOrThrow(Registries.BIOME);
+		BiomeRegion region = BiomeRegion.builder(BiomeTestMod.id("weighted_end_test")).end()
+				.replace(Biomes.END_HIGHLANDS, net.biome.api.region.WeightedBiomes.builder()
+						.add(BiomeTestMod.VOID_MEADOW, 1)
+						.add(BiomeTestMod.ASH_BARRENS, 3)
+						.size(3)
+						.build())
+				.build();
+		RegionBiomeLookup lookup = RegionBiomeLookup.create(SEED, 7, 0.0F, List.of(region), List.of(), List.of(), 6, List.of(), SEED, null, biomeLookup);
+		Holder<Biome> highlands = biomeLookup.getOrThrow(Biomes.END_HIGHLANDS);
+		Holder<Biome> midlands = biomeLookup.getOrThrow(Biomes.END_MIDLANDS);
+		Map<ResourceKey<Biome>, Integer> counts = new HashMap<>();
+		int total = 0;
+		for (int i = 0; i < 200; i++) {
+			for (int j = 0; j < 200; j++) {
+				int qx = (i - 100) * 12;
+				int qz = (j - 100) * 12;
+				counts.merge(lookup.replaceWithoutClimate(highlands, qx, qz).unwrapKey().orElseThrow(), 1, Integer::sum);
+				total++;
+				ctx.assertTrue(lookup.replaceWithoutClimate(midlands, qx, qz).is(Biomes.END_MIDLANDS),
+						Component.literal("midlands should not be replaced"));
+			}
+		}
+		JONE500BiomeAPI.LOGGER.info("[test] weighted End region: {}", counts);
+		checkShare(ctx, "void meadow", counts.getOrDefault(BiomeTestMod.VOID_MEADOW, 0), total, 0.25);
+		checkShare(ctx, "ash barrens", counts.getOrDefault(BiomeTestMod.ASH_BARRENS, 0), total, 0.75);
+		ctx.succeed();
+	}
+
+	/** The testmod's weighted Nether region on the real Nether: nether wastes become sulfur wastes / bone fields about 3 : 1. */
+	@GameTest(maxTicks = 20)
+	public void weightedNetherRegionWorks(GameTestHelper ctx) {
+		ServerLevel nether = ctx.getLevel().getServer().getLevel(Level.NETHER);
+		ctx.assertTrue(nether != null, Component.literal("no Nether level"));
+		BiomeSource source = nether.getChunkSource().getGenerator().getBiomeSource();
+		RegionBiomeLookup lookup = apiSource(source).jone500$getLookup();
+		Climate.Sampler sampler = nether.getChunkSource().randomState().sampler();
+		int sulfur = 0;
+		int bone = 0;
+		int wastesInside = 0;
+		int outside = 0;
+		for (int i = 0; i < 200; i++) {
+			for (int j = 0; j < 200; j++) {
+				int qx = (i - 100) * 16;
+				int qz = (j - 100) * 16;
+				Holder<Biome> biome = source.getNoiseBiome(qx, 16, qz, sampler);
+				BiomeRegion region = lookup.getRegionAt(qx, qz);
+				boolean inside = region != null && region.getId().equals(BiomeTestMod.WASTES);
+				if (biome.is(BiomeTestMod.SULFUR_WASTES) || biome.is(BiomeTestMod.BONE_FIELDS)) {
+					if (!inside) outside++;
+					if (biome.is(BiomeTestMod.SULFUR_WASTES)) sulfur++;
+					else bone++;
+				}
+				if (inside && biome.is(Biomes.NETHER_WASTES)) wastesInside++;
+			}
+		}
+		JONE500BiomeAPI.LOGGER.info("[test] weighted nether: sulfur={} bone={} nether wastes inside={} weighted outside={}", sulfur, bone, wastesInside, outside);
+		ctx.assertTrue(sulfur > 0 && bone > 0, Component.literal("weighted Nether biomes missing: sulfur " + sulfur + ", bone " + bone));
+		ctx.assertTrue(outside == 0, Component.literal("weighted Nether biomes outside their region " + outside + " times"));
+		ctx.assertTrue(wastesInside == 0, Component.literal("nether wastes left inside the region " + wastesInside + " times"));
+		double share = (double) sulfur / (sulfur + bone);
+		ctx.assertTrue(Math.abs(share - 0.75) < 0.1, Component.literal("sulfur share " + share + ", expected about 0.75"));
+		ctx.assertTrue(source.possibleBiomes().stream().anyMatch(b -> b.is(BiomeTestMod.BONE_FIELDS)),
+				Component.literal("bone fields is not a possible Nether biome"));
 		ctx.succeed();
 	}
 

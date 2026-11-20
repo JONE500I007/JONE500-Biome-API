@@ -19,8 +19,9 @@ import net.minecraft.world.level.biome.Climate;
 import net.minecraft.world.level.biome.TheEndBiomeSource;
 
 /**
- * The End has no regions; only BiomeReplacements (area and whole-biome) are applied to the vanilla biome.
- * Biomes placed by Fabric API's TheEndBiomes (or other mods) can be replaced too.
+ * The End has no climate: End regions ({@code BiomeRegion.builder(id).end()}) and BiomeReplacements (area and
+ * whole-biome) relabel the biome vanilla picked. Biomes placed by Fabric API's TheEndBiomes (or other mods) can
+ * be replaced too.
  */
 @Mixin(TheEndBiomeSource.class)
 public abstract class TheEndBiomeSourceMixin implements BiomeApiBiomeSource {
@@ -50,7 +51,7 @@ public abstract class TheEndBiomeSourceMixin implements BiomeApiBiomeSource {
 	private Holder<Biome> jone500$replace(int quartX, int quartY, int quartZ, Climate.Sampler sampler, Operation<Holder<Biome>> original) {
 		Holder<Biome> biome = original.call(quartX, quartY, quartZ, sampler);
 		RegionBiomeLookup lookup = jone500$lookup;
-		return lookup == null ? biome : lookup.applyGlobalReplacements(biome, quartX, quartZ);
+		return lookup == null ? biome : lookup.replaceWithoutClimate(biome, quartX, quartZ);
 	}
 
 	@ModifyReturnValue(method = "collectPossibleBiomes", at = @At("RETURN"))

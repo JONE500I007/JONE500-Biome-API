@@ -56,7 +56,19 @@ public class BiomeRobustnessGameTest {
 		expectError(problems, "exclusive biome not in the region",
 				() -> BiomeRegion.builder(BiomeTestMod.id("x")).replace(Biomes.PLAINS, mine).exclusive(mine, BiomeTestMod.BLUE_FOREST).build());
 		expectError(problems, "null id", () -> BiomeRegion.builder(null));
-		expectError(problems, "null biome", () -> BiomeRegion.builder(BiomeTestMod.id("x")).replace(Biomes.PLAINS, null));
+		expectError(problems, "null biome", () -> BiomeRegion.builder(BiomeTestMod.id("x")).replace(Biomes.PLAINS, (ResourceKey<Biome>) null));
+		expectError(problems, "weighted: no biomes", () -> net.biome.api.region.WeightedBiomes.builder().build());
+		expectError(problems, "weighted: weight 0", () -> net.biome.api.region.WeightedBiomes.builder().add(mine, 0.0F));
+		expectError(problems, "weighted: same biome twice", () -> net.biome.api.region.WeightedBiomes.builder().add(mine, 1).add(mine, 2));
+		expectError(problems, "weighted: size too big", () -> net.biome.api.region.WeightedBiomes.builder().size(11));
+		expectError(problems, "weighted: keepOriginal negative", () -> net.biome.api.region.WeightedBiomes.builder().keepOriginal(-1.0F));
+		expectError(problems, "weighted + single replace of the same biome", () -> BiomeRegion.builder(BiomeTestMod.id("x")).replace(Biomes.PLAINS, mine)
+				.replace(Biomes.PLAINS, net.biome.api.region.WeightedBiomes.builder().add(BiomeTestMod.BLUE_FOREST, 1).build()));
+		expectError(problems, "exclusive with a weighted biome", () -> BiomeRegion.builder(BiomeTestMod.id("x")).replace(Biomes.FOREST, mine)
+				.replace(Biomes.PLAINS, net.biome.api.region.WeightedBiomes.builder().add(BiomeTestMod.BLUE_FOREST, 1).build())
+				.exclusive(mine, BiomeTestMod.BLUE_FOREST).build());
+		expectError(problems, "weighted replacement registered too late", () -> BiomeReplacements.replace(Biomes.PLAINS,
+				net.biome.api.region.WeightedBiomes.builder().add(mine, 1).build()));
 		expectError(problems, "empty climate list", () -> BiomeRegion.builder(BiomeTestMod.id("x")).addBiome(List.of(), mine, 1.0F));
 		expectError(problems, "climate range min > max", () -> ClimatePoints.builder().humidity(0.5F, -0.5F));
 		expectError(problems, "climate with no values", () -> ClimatePoints.builder().temperature(new Climate.Parameter[0]));

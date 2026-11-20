@@ -153,10 +153,61 @@ final class ReadmeExamples {
 				.register();
 	}
 
+	static void endRegion() {
+		BiomeRegion.builder(Identifier.fromNamespaceAndPath("mymod", "ashlands"))
+				.end()
+				.weight(5)
+				.replace(Biomes.END_BARRENS, DUNES)
+				.replace(Biomes.END_MIDLANDS, CLAY_FOREST, 0.5F)
+				.replace(Biomes.END_HIGHLANDS, SLIME_MARSH)
+				.exclusive(CLAY_FOREST, SLIME_MARSH)
+				.register();
+	}
+
+	static void surfaceRules() {
+		net.biome.api.surface.BiomeSurfaceRules.addEnd(Identifier.fromNamespaceAndPath("mymod", "ash_floor"),
+				net.minecraft.world.level.levelgen.SurfaceRules.ifTrue(net.minecraft.world.level.levelgen.SurfaceRules.isBiome(DUNES),
+						net.minecraft.world.level.levelgen.SurfaceRules.ifTrue(net.minecraft.world.level.levelgen.SurfaceRules.ON_FLOOR,
+								net.minecraft.world.level.levelgen.SurfaceRules.state(net.minecraft.world.level.block.Blocks.SMOOTH_BASALT.defaultBlockState()))));
+	}
+
+	static void weighted() {
+		BiomeRegion.builder(Identifier.fromNamespaceAndPath("mymod", "wastes"))
+				.nether()
+				.weight(4)
+				.replace(Biomes.NETHER_WASTES, net.biome.api.region.WeightedBiomes.builder()
+						.add(EMBER_FOREST, 5)
+						.add(DUNES, 3)
+						.add(SLIME_MARSH, 1)
+						.build())
+				.replace(Biomes.SOUL_SAND_VALLEY, net.biome.api.region.WeightedBiomes.builder()
+						.add(CLAY_FOREST, 1)
+						.keepOriginal(2)
+						.size(6)
+						.build())
+				.register();
+		BiomeRegion.builder(Identifier.fromNamespaceAndPath("mymod", "crystal_lands"))
+				.end()
+				.replace(Biomes.END_HIGHLANDS, net.biome.api.region.WeightedBiomes.builder()
+						.add(CRYSTAL_CAVES, 3)
+						.add(DIAMOND_CAVES, 2)
+						.add(APPLE_GROVE, 1)
+						.build())
+				.register();
+		BiomeReplacements.replace(Biomes.NETHER_WASTES, net.biome.api.region.WeightedBiomes.builder()
+				.add(EMBER_FOREST, 2)
+				.add(DUNES, 1)
+				.keepOriginal(3)
+				.build());
+	}
+
 	static void replacements() {
 		BiomeReplacements.replace(Biomes.FOREST, APPLE_FOREST, 0.25F);
 		BiomeReplacements.replace(Biomes.FLOWER_FOREST, APPLE_FOREST, 0.1F);
 		BiomeReplacements.replaceWholeBiome(Biomes.LUSH_CAVES, CRYSTAL_CAVES, 0.3F);
+
+		BiomeReplacements.replace(APPLE_GROVE, GOLDEN_ORCHARD, 0.2F);
+		BiomeReplacements.replaceWholeBiome(APPLE_GROVE, HIGHLAND_MEADOW, 0.5F);
 
 		BiomeReplacements.replace(Biomes.DESERT, Biomes.SAVANNA, 0.3F);
 		BiomeReplacements.replace(Biomes.DESERT, Biomes.BADLANDS, 0.1F);

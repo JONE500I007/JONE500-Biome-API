@@ -32,7 +32,10 @@ public class BiomeTestModDataGen implements DataGeneratorEntrypoint {
 			protected void configure(HolderLookup.Provider lookup, Entries entries) {
 				entries.add(lookup.lookupOrThrow(Registries.BIOME), BiomeTestMod.ORANGE_HILLS);
 				entries.add(lookup.lookupOrThrow(Registries.BIOME), BiomeTestMod.EMBER_FOREST);
+				entries.add(lookup.lookupOrThrow(Registries.BIOME), BiomeTestMod.SULFUR_WASTES);
+				entries.add(lookup.lookupOrThrow(Registries.BIOME), BiomeTestMod.BONE_FIELDS);
 				entries.add(lookup.lookupOrThrow(Registries.BIOME), BiomeTestMod.VOID_MEADOW);
+				entries.add(lookup.lookupOrThrow(Registries.BIOME), BiomeTestMod.ASH_BARRENS);
 			}
 
 			@Override
@@ -54,7 +57,10 @@ public class BiomeTestModDataGen implements DataGeneratorEntrypoint {
 				VanillaBiomeTags.copy(Biomes.SAVANNA, BiomeTestMod.ORANGE_HILLS, VanillaBiomeTags.NO_VILLAGES, (tag, biome) -> builder(tag).add(biome));
 				// Nether / End biomes: fortresses, bastions, is_nether... / end cities, is_end
 				VanillaBiomeTags.copy(Biomes.CRIMSON_FOREST, BiomeTestMod.EMBER_FOREST, (tag, biome) -> builder(tag).add(biome));
+				VanillaBiomeTags.copy(Biomes.NETHER_WASTES, BiomeTestMod.SULFUR_WASTES, (tag, biome) -> builder(tag).add(biome));
+				VanillaBiomeTags.copy(Biomes.NETHER_WASTES, BiomeTestMod.BONE_FIELDS, (tag, biome) -> builder(tag).add(biome));
 				VanillaBiomeTags.copy(Biomes.END_HIGHLANDS, BiomeTestMod.VOID_MEADOW, (tag, biome) -> builder(tag).add(biome));
+				VanillaBiomeTags.copy(Biomes.END_BARRENS, BiomeTestMod.ASH_BARRENS, (tag, biome) -> builder(tag).add(biome));
 			}
 
 			@Override
@@ -100,11 +106,26 @@ public class BiomeTestModDataGen implements DataGeneratorEntrypoint {
 				.spawn(EntityType.ZOMBIFIED_PIGLIN, 10, 2, 4)
 				.build());
 
+		// Two simple Nether biomes for the weighted region test.
+		context.register(BiomeTestMod.SULFUR_WASTES, BiomeMaker.nether(context)
+				.fogColor(0x9A8A10)
+				.particles(ParticleTypes.WHITE_ASH, 0.02F)
+				.build());
+		context.register(BiomeTestMod.BONE_FIELDS, BiomeMaker.nether(context)
+				.fogColor(0xC8C0A8)
+				.build());
+
 		// End biome with chorus plants and portal particles.
 		context.register(BiomeTestMod.VOID_MEADOW, BiomeMaker.end(context)
 				.fogColor(0x2A0A3A)
 				.particles(ParticleTypes.PORTAL, 0.02F)
 				.addFeature(GenerationStep.Decoration.VEGETAL_DECORATION, EndPlacements.CHORUS_PLANT)
+				.build());
+
+		// End biome for the End region test: grey fog and ash.
+		context.register(BiomeTestMod.ASH_BARRENS, BiomeMaker.end(context)
+				.fogColor(0x3A3A3A)
+				.particles(ParticleTypes.WHITE_ASH, 0.03F)
 				.build());
 	}
 }

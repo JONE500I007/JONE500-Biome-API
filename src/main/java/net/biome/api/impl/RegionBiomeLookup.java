@@ -37,19 +37,24 @@ public final class RegionBiomeLookup {
 	private final RegionLayout layout;
 	private final List<BiomeRegion> regions;
 	private final Climate.ParameterList<Entry>[] trees;
+	/** For dimensions without climate (the End): per region, original biome -> replacement. */
+	private final Map<ResourceKey<Biome>, Entry>[] replacementMaps;
 	private final RegionLayout replacementLayout;
 	private final Map<ResourceKey<Biome>, GlobalReplacement> globalReplacements;
+	private final Map<ResourceKey<Biome>, WeightedPick> globalWeighted;
 	private final Map<ResourceKey<Biome>, Holder<Biome>> wholeBiomeSwaps;
 	private final Set<Holder<Biome>> addedBiomes;
 
 	private RegionBiomeLookup(RegionLayout layout, List<BiomeRegion> regions, Climate.ParameterList<Entry>[] trees,
-			RegionLayout replacementLayout, Map<ResourceKey<Biome>, GlobalReplacement> globalReplacements,
-			Map<ResourceKey<Biome>, Holder<Biome>> wholeBiomeSwaps, Set<Holder<Biome>> addedBiomes) {
+			Map<ResourceKey<Biome>, Entry>[] replacementMaps, RegionLayout replacementLayout, Map<ResourceKey<Biome>, GlobalReplacement> globalReplacements,
+			Map<ResourceKey<Biome>, WeightedPick> globalWeighted, Map<ResourceKey<Biome>, Holder<Biome>> wholeBiomeSwaps, Set<Holder<Biome>> addedBiomes) {
 		this.layout = layout;
 		this.regions = regions;
 		this.trees = trees;
+		this.replacementMaps = replacementMaps;
 		this.replacementLayout = replacementLayout;
 		this.globalReplacements = globalReplacements;
+		this.globalWeighted = globalWeighted;
 		this.wholeBiomeSwaps = wholeBiomeSwaps;
 		this.addedBiomes = addedBiomes;
 	}
@@ -97,12 +102,21 @@ public final class RegionBiomeLookup {
 	 * @param wholeSwaps   whole-biome replacements, sorted (only the ones active for this seed are used)
 	 * @param wholeSwapSeed the world seed (whole-biome swaps are decided per world, the same in every dimension)
 	 */
-	@SuppressWarnings("unchecked")
 	public static RegionBiomeLookup create(long seed, int regionSize, float vanillaWeight, List<BiomeRegion> regions,
 			List<BiomeRegion.Replacement> replacements, int replacementPatchSize, List<BiomeRegion.Replacement> wholeSwaps, long wholeSwapSeed,
 			Climate.@Nullable ParameterList<Holder<Biome>> original, HolderGetter<Biome> biomes) {
-		if (original == null && !regions.isEmpty()) {
-			throw new IllegalArgumentException("regions need the dimension's climate table");
+		return create(seed, regionSize, vanillaWeight, regions, replacements, List.of(), replacementPatchSize, wholeSwaps, wholeSwapSeed,
+				original, biomes);
+	}
+
+	/** Same, with world-wide weighted replacements ({@code BiomeReplacements.replace(original, WeightedBiomes)}). */
+	@SuppressWarnings("unchecked")
+	public static RegionBiomeLookup create(long seed, int regionSize, float vanillaWeight, List<BiomeRegion> regions,
+			List<BiomeRegion.Replacement> replacements, List<BiomeRegion.WeightedReplacement> weightedReplacements, int replacementPatchSize,
+			List<BiomeRegion.Replacement> wholeSwaps, long wholeSwapSeed,
+			Climate.@Nullable ParameterList<Holder<Biome>> original, HolderGetter<Biome> biomes) {
+		if (original == null && regions.stream().anyMatch(r -> !r.getExtraPoints().isEmpty())) {
+			throw new IllegalArgumentException("regions with addBiome(...) need the dimension's climate table");
 		}
 		float[] weights = new float[regions.size()];
 		for (int i = 0; i < regions.size(); i++) {
@@ -111,10 +125,16 @@ public final class RegionBiomeLookup {
 		RegionLayout layout = new RegionLayout(seed, regionSize, vanillaWeight, weights);
 
 		Climate.ParameterList<Entry>[] trees = new Climate.ParameterList[regions.size()];
+		Map<ResourceKey<Biome>, Entry>[] replacementMaps = new Map[regions.size()];
 		Set<Holder<Biome>> added = new LinkedHashSet<>();
 
 		for (int r = 0; r < regions.size(); r++) {
-			trees[r] = buildRegionTree(regions.get(r), original, biomes, added);
+			if (original != null) {
+				trees[r] = buildRegionTree(seed, regions.get(r), original, biomes, added);
+			} else {
+				// No climate (the End): the region only relabels the biome the dimension picked.
+				replacementMaps[r] = Map.copyOf(buildReplacements(seed, regions.get(r), biomes, added, new HashMap<>(), new HashMap<>()));
+			}
 		}
 
 		// World-wide replacements: original biome -> biomes + cumulative chances
@@ -143,6 +163,14 @@ public final class RegionBiomeLookup {
 		});
 		RegionLayout replacementLayout = new RegionLayout(seed ^ REPLACEMENT_SEED_SALT, replacementPatchSize, 1.0F, new float[0]);
 
+		Map<ResourceKey<Biome>, WeightedPick> globalWeighted = new HashMap<>();
+		for (BiomeRegion.WeightedReplacement w : weightedReplacements) {
+			WeightedPick pick = WeightedPick.create(seed, "weighted#" + w.original().identifier(), w.biomes(), biomes, added, "Replacement");
+			if (pick != null) {
+				globalWeighted.put(w.original(), pick);
+			}
+		}
+
 		Map<ResourceKey<Biome>, Holder<Biome>> whole = new HashMap<>();
 		chooseWholeBiomeSwaps(wholeSwapSeed, wholeSwaps).forEach((from, to) -> {
 			Optional<Holder.Reference<Biome>> holder = biomes.get(to);
@@ -156,17 +184,25 @@ public final class RegionBiomeLookup {
 			JONE500BiomeAPI.LOGGER.info("This world: every {} is replaced by {}", from.identifier(), to.identifier());
 		});
 
-		return new RegionBiomeLookup(layout, List.copyOf(regions), trees, replacementLayout, Map.copyOf(global), Map.copyOf(whole),
-				Collections.unmodifiableSet(added));
+		return new RegionBiomeLookup(layout, List.copyOf(regions), trees, replacementMaps, replacementLayout, Map.copyOf(global),
+				Map.copyOf(globalWeighted), Map.copyOf(whole), Collections.unmodifiableSet(added));
 	}
 
-	private static Climate.ParameterList<Entry> buildRegionTree(BiomeRegion region, Climate.ParameterList<Holder<Biome>> original,
+	private static Climate.ParameterList<Entry> buildRegionTree(long seed, BiomeRegion region, Climate.ParameterList<Holder<Biome>> original,
 			HolderGetter<Biome> biomes, Set<Holder<Biome>> added) {
+		String regionId = region.getId().toString();
+		Map<ResourceKey<Biome>, int[]> groupOf = new HashMap<>();
+		Map<ResourceKey<Biome>, Long> groupSaltOf = new HashMap<>();
+		Map<ResourceKey<Biome>, Entry> replacementFor = buildReplacements(seed, region, biomes, added, groupOf, groupSaltOf);
+		return buildRegionTree(region, regionId, original, biomes, added, replacementFor, groupOf, groupSaltOf);
+	}
+
+	/** The region's replace(...) entries (single and weighted) by original biome (fills the exclusive group maps too). */
+	private static Map<ResourceKey<Biome>, Entry> buildReplacements(long seed, BiomeRegion region, HolderGetter<Biome> biomes, Set<Holder<Biome>> added,
+			Map<ResourceKey<Biome>, int[]> groupOf, Map<ResourceKey<Biome>, Long> groupSaltOf) {
 		String regionId = region.getId().toString();
 
 		// biome -> (index in group, group size) and group salt
-		Map<ResourceKey<Biome>, int[]> groupOf = new HashMap<>();
-		Map<ResourceKey<Biome>, Long> groupSaltOf = new HashMap<>();
 		List<List<ResourceKey<Biome>>> groups = region.getExclusiveGroups();
 		for (int g = 0; g < groups.size(); g++) {
 			List<ResourceKey<Biome>> group = groups.get(g);
@@ -189,7 +225,21 @@ public final class RegionBiomeLookup {
 			replacementFor.put(repl.original(), newEntry(holder.get(), null, null, repl.chance(), regionId, repl.biome(), groupOf, groupSaltOf));
 			added.add(holder.get());
 		}
+		for (BiomeRegion.WeightedReplacement w : region.getWeightedReplacements()) {
+			String name = regionId + "#weighted#" + w.original().identifier();
+			WeightedPick pick = WeightedPick.create(seed, name, w.biomes(), biomes, added, "Region " + regionId);
+			if (pick == null) {
+				continue;
+			}
+			// biome is only a marker here ("replaced"); the real biome comes from the pick
+			replacementFor.put(w.original(), new Entry(pick.firstTarget(), null, null, w.chance(), RegionLayout.salt(name), 0L, -1, 0, pick));
+		}
+		return replacementFor;
+	}
 
+	private static Climate.ParameterList<Entry> buildRegionTree(BiomeRegion region, String regionId, Climate.ParameterList<Holder<Biome>> original,
+			HolderGetter<Biome> biomes, Set<Holder<Biome>> added, Map<ResourceKey<Biome>, Entry> replacementFor,
+			Map<ResourceKey<Biome>, int[]> groupOf, Map<ResourceKey<Biome>, Long> groupSaltOf) {
 		List<Pair<Climate.ParameterPoint, Entry>> points = new ArrayList<>(original.values().size() + region.getExtraPoints().size());
 		// Extra points usually overlap vanilla points exactly (distance 0 for both). Give the original points
 		// the smallest possible extra offset so the region's own points win those ties.
@@ -224,9 +274,9 @@ public final class RegionBiomeLookup {
 		long chanceSalt = RegionLayout.salt(regionId + "#" + key.identifier());
 		int[] group = groupOf.get(key);
 		if (group == null) {
-			return new Entry(biome, original, strictBox, chance, chanceSalt, 0L, -1, 0);
+			return new Entry(biome, original, strictBox, chance, chanceSalt, 0L, -1, 0, null);
 		}
-		return new Entry(biome, original, strictBox, chance, chanceSalt, groupSaltOf.get(key), group[0], group[1]);
+		return new Entry(biome, original, strictBox, chance, chanceSalt, groupSaltOf.get(key), group[0], group[1], null);
 	}
 
 	/**
@@ -248,7 +298,7 @@ public final class RegionBiomeLookup {
 			return entry.original;
 		}
 		if (isEnabled(entry, cell) && (entry.strictBox == null || isInside(entry.strictBox, target))) {
-			return entry.biome;
+			return entry.pick == null ? entry.biome : entry.pick.pick(entry.original, quartX, quartZ);
 		}
 		return entry.original != null ? entry.original : vanilla.findValue(target);
 	}
@@ -258,15 +308,35 @@ public final class RegionBiomeLookup {
 		return layout.cellAt(quartX, quartZ).region() == RegionLayout.VANILLA;
 	}
 
-	/** World-wide replacements only (also used for the End, which has no regions). */
+	/**
+	 * For dimensions without climate (the End): the biome the dimension picked, with the region's replacements
+	 * (inside region patches) and then the world-wide replacements applied.
+	 */
+	public Holder<Biome> replaceWithoutClimate(Holder<Biome> biome, int quartX, int quartZ) {
+		RegionLayout.Cell cell = layout.cellAt(quartX, quartZ);
+		if (cell.region() != RegionLayout.VANILLA && biome instanceof Holder.Reference<Biome> ref) {
+			Map<ResourceKey<Biome>, Entry> map = replacementMaps[cell.region()];
+			Entry entry = map == null ? null : map.get(ref.key());
+			if (entry != null && isEnabled(entry, cell)) {
+				biome = entry.pick == null ? entry.biome : entry.pick.pick(biome, quartX, quartZ);
+			}
+		}
+		return applyGlobalReplacements(biome, quartX, quartZ);
+	}
+
+	/** World-wide replacements only. */
 	public Holder<Biome> applyGlobalReplacements(Holder<Biome> biome, int quartX, int quartZ) {
-		if ((globalReplacements.isEmpty() && wholeBiomeSwaps.isEmpty()) || !(biome instanceof Holder.Reference<Biome> ref)) {
+		if ((globalReplacements.isEmpty() && globalWeighted.isEmpty() && wholeBiomeSwaps.isEmpty()) || !(biome instanceof Holder.Reference<Biome> ref)) {
 			return biome;
 		}
 		// All or nothing for this world: wins over area replacements of the same biome.
 		Holder<Biome> whole = wholeBiomeSwaps.get(ref.key());
 		if (whole != null) {
 			return whole;
+		}
+		WeightedPick weighted = globalWeighted.get(ref.key());
+		if (weighted != null) {
+			return weighted.pick(biome, quartX, quartZ);
 		}
 		GlobalReplacement repl = globalReplacements.get(ref.key());
 		if (repl == null) {
@@ -324,13 +394,85 @@ public final class RegionBiomeLookup {
 	 * @param strictBox for strict extra points: the ranges the climate must really be inside
 	 */
 	record Entry(@Nullable Holder<Biome> biome, @Nullable Holder<Biome> original, Climate.@Nullable ParameterPoint strictBox,
-			float chance, long chanceSalt, long groupSalt, int groupIndex, int groupSize) {
+			float chance, long chanceSalt, long groupSalt, int groupIndex, int groupSize, @Nullable WeightedPick pick) {
 		static Entry original(Holder<Biome> original) {
-			return new Entry(null, original, null, 1.0F, 0L, 0L, -1, 0);
+			return new Entry(null, original, null, 1.0F, 0L, 0L, -1, 0, null);
 		}
 
 		Entry withOriginal(Holder<Biome> newOriginal) {
-			return new Entry(biome, newOriginal, strictBox, chance, chanceSalt, groupSalt, groupIndex, groupSize);
+			return new Entry(biome, newOriginal, strictBox, chance, chanceSalt, groupSalt, groupIndex, groupSize, pick);
+		}
+	}
+
+	/** Picks one of several biomes by weight, in small cells of its own layout (WeightedBiomes). */
+	static final class WeightedPick {
+		private static final long PICK_SALT = 0x6A09E667F3BCC909L;
+		private final RegionLayout cells;
+		/** null = keep the original biome */
+		private final @Nullable Holder<Biome>[] targets;
+		private final double[] cumulative;
+
+		private WeightedPick(RegionLayout cells, @Nullable Holder<Biome>[] targets, double[] cumulative) {
+			this.cells = cells;
+			this.targets = targets;
+			this.cumulative = cumulative;
+		}
+
+		/** Null if none of the biomes is registered (all skipped with a warning). */
+		@SuppressWarnings("unchecked")
+		static @Nullable WeightedPick create(long seed, String name, net.biome.api.region.WeightedBiomes weighted, HolderGetter<Biome> biomes,
+				Set<Holder<Biome>> added, String owner) {
+			List<Holder<Biome>> holders = new ArrayList<>();
+			List<Float> weights = new ArrayList<>();
+			for (net.biome.api.region.WeightedBiomes.Entry e : weighted.getEntries()) {
+				Optional<Holder.Reference<Biome>> holder = biomes.get(e.biome());
+				if (holder.isEmpty()) {
+					JONE500BiomeAPI.LOGGER.warn("{}: biome {} is not registered (missing biome JSON?), skipped in WeightedBiomes",
+							owner, e.biome().identifier());
+					continue;
+				}
+				holders.add(holder.get());
+				weights.add(e.weight());
+				added.add(holder.get());
+			}
+			if (holders.isEmpty()) {
+				return null;
+			}
+			if (weighted.getOriginalWeight() > 0.0F) {
+				holders.add(null);
+				weights.add(weighted.getOriginalWeight());
+			}
+			double total = 0.0;
+			for (float w : weights) {
+				total += w;
+			}
+			Holder<Biome>[] targets = holders.toArray(new Holder[0]);
+			double[] cumulative = new double[targets.length];
+			double sum = 0.0;
+			for (int i = 0; i < targets.length; i++) {
+				sum += weights.get(i) / total;
+				cumulative[i] = sum;
+			}
+			cumulative[targets.length - 1] = 1.0;
+			RegionLayout cells = new RegionLayout(seed ^ RegionLayout.salt(name), weighted.getSize(), 1.0F, new float[0]);
+			return new WeightedPick(cells, targets, cumulative);
+		}
+
+		Holder<Biome> pick(Holder<Biome> original, int quartX, int quartZ) {
+			double roll = cells.random(cells.cellAt(quartX, quartZ), PICK_SALT);
+			for (int i = 0; i < cumulative.length; i++) {
+				if (roll < cumulative[i]) {
+					Holder<Biome> target = targets[i];
+					return target == null ? original : target;
+				}
+			}
+			Holder<Biome> last = targets[targets.length - 1];
+			return last == null ? original : last;
+		}
+
+		/** Any real biome of this pick (marks an entry as "replaced"). */
+		Holder<Biome> firstTarget() {
+			return targets[0];
 		}
 	}
 

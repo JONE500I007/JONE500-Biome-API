@@ -1,8 +1,6 @@
 # JONE500 Biome API
 
-> **Beta (0.x).** The API may still change before 1.0.0.
-
-A Fabric library for **Minecraft 26.1** that adds your Overworld biomes in **regions**:
+A Fabric library for **Minecraft 26.1** that adds your Overworld, Nether and End biomes in **regions**:
 
 - **Deterministic:** regions are sorted by id, so the same seed always gives the same world, no matter
   in which order mods load.
@@ -10,11 +8,12 @@ A Fabric library for **Minecraft 26.1** that adds your Overworld biomes in **reg
   (e.g. 30%), so your biomes don't all appear at once.
 - **Exclusive biomes:** "at most one of these biomes in the same patch".
 - **Decimal weights:** very rare regions are possible (`weight(0.25F)`).
+- **Many biomes by weight:** "nether wastes become 5 of my biomes, 5 : 3 : 1 : 1 : 1" with `WeightedBiomes`, no climate needed (great for the Nether and the End).
 - **World-wide replacement:** "30% of all forests become my biome", or "in 50% of worlds, every cherry grove is my biome" (also caves and oceans), without a region.
 - **Strict climate:** your inland biome never shows up in the sea.
 - **Surface rules** for your biomes (which blocks make up the ground).
 
-Works in the **Overworld** and the **Nether** (regions), and the **End** (replacements; placement with Fabric API).
+Works in the **Overworld**, the **Nether** and the **End** (regions and replacements; in the End also with Fabric API's placement).
 
 ## How it works (short)
 
@@ -33,7 +32,7 @@ repositories {
 }
 
 dependencies {
-    implementation "maven.modrinth:jone500-biome-api:0.1.0+26.1"
+    implementation "maven.modrinth:jone500-biome-api:1.0.0+26.1"
 }
 ```
 
@@ -41,7 +40,7 @@ dependencies {
 
 ```json
 "depends": {
-    "jone500-biome-api": ">=0.1.0"
+    "jone500-biome-api": ">=1.0.0"
 }
 ```
 
@@ -200,10 +199,11 @@ BiomeRegion.builder(Identifier.fromNamespaceAndPath("mymod", "orchards"))
 
 | Method | What it does |
 |---|---|
-| `.overworld()` / `.nether()` | Which dimension the region is in. Default: Overworld |
+| `.overworld()` / `.nether()` / `.end()` | Which dimension the region is in. Default: Overworld. End regions can only use `replace` (see [The End](#4c-the-end)) |
 | `.weight(float)` | How often this region's patches appear. Vanilla = 10. Decimals allowed. Default 1. |
 | `.replace(vanilla, yours)` | Inside this region, `vanilla` becomes `yours` |
 | `.replace(vanilla, yours, chance)` | Same, but only in `chance` (0-1) of this region's patches; elsewhere the vanilla biome stays |
+| `.replace(vanilla, WeightedBiomes[, chance])` | `vanilla` becomes **one of several biomes, picked by weight** (see [below](#several-biomes-by-weight-weightedbiomes)) |
 | `.addBiome(ClimatePoints..., yours[, chance])` | Adds your biome at its **own climate** (see below), only inside this region |
 | `.addBiome(point, yours[, chance])` | Same with a raw `Climate.ParameterPoint` |
 | `.exclusive(a, b, ...)` | At most one of these biomes in the same patch; the others keep the vanilla biome there |
@@ -296,6 +296,44 @@ BiomeRegion.builder(Identifier.fromNamespaceAndPath("mymod", "meadows"))
         .register();
 ```
 
+### Several biomes by weight: `WeightedBiomes`
+
+When many of your biomes should share the place of **one** vanilla biome, give each a **weight** instead of
+looking for climate points. This needs no climate, so it works the same in the **Overworld, the Nether and
+the End**, and is the easiest way to add many Nether or End biomes:
+
+```java
+BiomeRegion.builder(Identifier.fromNamespaceAndPath("mymod", "wastes"))
+        .nether()
+        .weight(4)
+        .replace(Biomes.NETHER_WASTES, WeightedBiomes.builder()
+                .add(ModBiomes.GRAVEL_DESERT, 5)        // 5 of 9
+                .add(ModBiomes.MAGMA_LAND, 3)           // 3 of 9
+                .add(ModBiomes.BONE_REEF, 1)            // 1 of 9
+                .build())
+        .replace(Biomes.SOUL_SAND_VALLEY, WeightedBiomes.builder()
+                .add(ModBiomes.SOUL_GROVE, 1)
+                .keepOriginal(2)                        // 2 of 3 stay soul sand valley
+                .size(6)                                // bigger pieces
+                .build())
+        .register();
+```
+
+| `WeightedBiomes.builder()` method | What it does |
+|---|---|
+| `.add(biome, weight)` | A biome and its weight (more than 0, decimals allowed). Weight 3 = about 3× as often as weight 1 |
+| `.keepOriginal(weight)` | The original biome stays in some pieces, with this weight. Default: never |
+| `.size(3 … 10)` | How big each biome piece is: about `4 << size` blocks apart. Default 5 (about 128 blocks); bigger = bigger biomes |
+
+The area of the original biome is cut into small pieces (irregular cells); each piece gets one biome, picked
+by weight from the world seed (the same seed always gives the same world). Measured in this API's tests:
+weights 5 : 3 : 1 gave 56% : 33% : 11%, and 3 : 1 in the real Nether gave 75% : 25%.
+
+Good to know:
+- `WeightedBiomes` biomes can't be used in `exclusive(...)` (they already never share one piece).
+- One vanilla biome can have either `replace(a, b)` or `replace(a, WeightedBiomes)` in the same region, not both.
+- Also works without a region: `BiomeReplacements.replace(Biomes.NETHER_WASTES, WeightedBiomes...)` (see 3b).
+
 ## 3b. Replace a vanilla biome everywhere (no region needed)
 
 There are two kinds. Both work for **any** Overworld biome: surface, ocean and cave biomes.
@@ -339,6 +377,20 @@ gone. This works in the whole Overworld, also inside regions where they keep the
 | `chance` means | % of your region's patches | % of the vanilla biome's area |
 | Patch size | Region patches (~512 blocks) | Small patches (~256 blocks, `BiomeReplacements.setPatchSize`) |
 
+### Everywhere, several biomes by weight
+
+```java
+// All nether wastes in the whole Nether: half stay, the rest is split 2 : 1 between your biomes
+BiomeReplacements.replace(Biomes.NETHER_WASTES, WeightedBiomes.builder()
+        .add(ModBiomes.GRAVEL_DESERT, 2)
+        .add(ModBiomes.MAGMA_LAND, 1)
+        .keepOriginal(3)
+        .build());
+```
+
+One vanilla biome can have either this or `replace(a, b, chance)`, not both. (`replaceWholeBiome` still
+wins in the worlds where it is on.)
+
 ### Only vanilla biomes: change how often they appear
 
 You don't need a biome of your own: the replacement can be a vanilla biome too.
@@ -362,7 +414,26 @@ BiomeSurfaceRules.addOverworld(Identifier.fromNamespaceAndPath("mymod", "surface
 ```
 
 Your rules run before the vanilla rules. Always wrap them in `SurfaceRules.isBiome(...)` so they only
-change your own biomes. For the Nether use `BiomeSurfaceRules.addNether(...)` the same way.
+change your own biomes. The Nether and the End work the same way:
+
+```java
+BiomeSurfaceRules.addNether(Identifier.fromNamespaceAndPath("mymod", "ember_floor"),
+        SurfaceRules.ifTrue(SurfaceRules.isBiome(ModBiomes.EMBER_FOREST),
+                SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
+                        SurfaceRules.state(Blocks.MAGMA_BLOCK.defaultBlockState()))));
+
+// The End: vanilla makes everything end stone; your rule runs first, so only the top of your biome changes
+BiomeSurfaceRules.addEnd(Identifier.fromNamespaceAndPath("mymod", "ash_floor"),
+        SurfaceRules.ifTrue(SurfaceRules.isBiome(ModBiomes.ASH_BARRENS),
+                SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
+                        SurfaceRules.state(Blocks.SMOOTH_BASALT.defaultBlockState()))));
+```
+
+| Method | Dimension |
+|---|---|
+| `BiomeSurfaceRules.addOverworld(id, rule)` | Overworld |
+| `BiomeSurfaceRules.addNether(id, rule)` | Nether |
+| `BiomeSurfaceRules.addEnd(id, rule)` | The End |
 
 ## 4b. The Nether
 
@@ -389,26 +460,74 @@ point wins (so each biome owns the area around its point):
 | Warped forest | `(0, 0.5)` (offset 0.375) |
 | Basalt deltas | `(-0.5, 0)` (offset 0.175) |
 
-Put your point between them; `netherPoint(t, h, offset)` makes it smaller with a higher offset. Make the
+Put your point between them; `netherPoint(t, h, offset)` makes it smaller with a higher offset. For **many**
+Nether biomes, points get crowded: use [`WeightedBiomes`](#several-biomes-by-weight-weightedbiomes) instead
+(e.g. nether wastes → 5 of your biomes by weight), or both together. Make the
 biome with `BiomeMaker.nether(context)` and copy tags (fortresses, bastions, `is_nether`) with
 `VanillaBiomeTags.copy(Biomes.CRIMSON_FOREST, ...)`.
 
 ## 4c. The End
 
-The End does not use climate: vanilla picks the main island, highlands, midlands, barrens or small islands
-from the terrain. Place End biomes with **Fabric API** (already a dependency), and use this API for
-replacements:
+The End does not use climate: vanilla picks the biome from the terrain.
+
+| Where | Vanilla biome |
+|---|---|
+| Main island (about 1000 blocks around 0, 0) | `the_end` |
+| High parts of the outer islands | `end_highlands` |
+| Middle parts | `end_midlands` |
+| Edges | `end_barrens` |
+| Small floating islands | `small_end_islands` |
+
+There are three ways to put your biomes there. Pick the simplest one that does what you want; you can also
+use them together.
+
+**1. Easiest: Fabric API** (already a dependency) gives your biome a share of one vanilla End biome,
+everywhere in the End:
 
 ```java
-TheEndBiomes.addHighlandsBiome(ModBiomes.VOID_MEADOW, 10.0);      // Fabric API: a share of the highlands
+TheEndBiomes.addHighlandsBiome(ModBiomes.VOID_MEADOW, 10.0);      // a share of the highlands
 TheEndBiomes.addSmallIslandsBiome(ModBiomes.VOID_MEADOW, 5.0);    // ... or midlands / barrens / main island
+```
 
-BiomeReplacements.replace(Biomes.END_BARRENS, ModBiomes.ASH_BARRENS, 0.3F);              // this API: 30% of the area
+**2. World-wide replacements** with a chance (like in the Overworld):
+
+```java
+BiomeReplacements.replace(Biomes.END_BARRENS, ModBiomes.ASH_BARRENS, 0.3F);              // 30% of the area
 BiomeReplacements.replaceWholeBiome(Biomes.SMALL_END_ISLANDS, ModBiomes.VOID_MEADOW, 1.0F); // or all of it
 ```
 
+**3. End regions:** big patches of the End that belong to your mod, so your End biomes appear **together**
+(a "zone" of your mod) instead of spread everywhere. Add `.end()` to a region:
+
+```java
+BiomeRegion.builder(Identifier.fromNamespaceAndPath("mymod", "ashlands"))
+        .end()
+        .weight(5)                                                       // vanilla is 10
+        .replace(Biomes.END_BARRENS, ModBiomes.ASH_BARRENS)              // in every patch of this region
+        .replace(Biomes.END_MIDLANDS, ModBiomes.ASH_PLAINS, 0.5F)        // in 50% of the patches
+        .replace(Biomes.END_HIGHLANDS, ModBiomes.CRYSTAL_SPIRES)
+        .exclusive(ModBiomes.ASH_PLAINS, ModBiomes.CRYSTAL_SPIRES)       // never both in one patch
+        .register();
+
+// Many End biomes in one ring, by weight
+BiomeRegion.builder(Identifier.fromNamespaceAndPath("mymod", "crystal_lands"))
+        .end()
+        .replace(Biomes.END_HIGHLANDS, WeightedBiomes.builder()
+                .add(ModBiomes.CRYSTAL_SPIRES, 3)
+                .add(ModBiomes.VOID_FOREST, 2)
+                .add(ModBiomes.AMBER_LAND, 1)
+                .build())
+        .register();
+```
+
+End regions use the same `weight`, `replace(a, b[, chance])`, `replace(a, WeightedBiomes)` and `exclusive` as
+the Overworld. Because the End has no climate, `addBiome(...)` / `ClimatePoints` / `strict()` can't be used
+there (you get a clear error). F3 shows `Biome API region: ...` in the End as well. Replacing `the_end` changes the main island around the exit
+portal, so usually leave it alone.
+
 Make the biome with `BiomeMaker.end(context)` (add e.g. `EndPlacements.CHORUS_PLANT`) and copy tags (end
 cities, `is_end`) with `VanillaBiomeTags.copy(Biomes.END_HIGHLANDS, ...)`.
+For the ground blocks of your End biome use `BiomeSurfaceRules.addEnd(...)` (see [Surface rules](#4-surface-rules-optional)).
 
 ## 5. Test it
 
@@ -583,6 +702,22 @@ BiomeReplacements.replaceWholeBiome(Biomes.CHERRY_GROVE, Biomes.MEADOW, 0.5F);  
 ```
 
 The chances for one biome can be split between several replacements, as long as they add up to 1 or less.
+
+**Your own biomes can be replaced too**, e.g. one modded biome by another one:
+
+```java
+BiomeReplacements.replace(ModBiomes.APPLE_GROVE, ModBiomes.GOLDEN_ORCHARD, 0.2F);     // 20% of apple groves
+BiomeReplacements.replaceWholeBiome(ModBiomes.APPLE_GROVE, ModBiomes.PEAR_GROVE, 0.5F); // half of worlds
+```
+
+Good to know:
+- It works for biomes placed by a region (`.replace(...)` / `.addBiome(...)`), vanilla biomes and End biomes
+  placed with Fabric API's `TheEndBiomes`. Biomes that another mod places with its own system (e.g.
+  TerraBlender) are not tested.
+- Replacements happen **once**, they don't chain: with `A -> B` and `B -> C`, the `A` places become `B`,
+  not `C`.
+- Use `BiomeReplacements` for this. `BiomeRegion...replace(a, b)` only replaces the vanilla biome that
+  would be there.
 
 ### Modpack settings (before a world loads)
 

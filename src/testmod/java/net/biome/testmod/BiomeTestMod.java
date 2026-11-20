@@ -41,8 +41,11 @@ public class BiomeTestMod implements ModInitializer {
 	public static final ResourceKey<Biome> ORANGE_HILLS = key("orange_hills");
 	/** Nether biome (BiomeMaker.nether, with particles). */
 	public static final ResourceKey<Biome> EMBER_FOREST = key("ember_forest");
+	public static final ResourceKey<Biome> SULFUR_WASTES = key("sulfur_wastes");
+	public static final ResourceKey<Biome> BONE_FIELDS = key("bone_fields");
 	/** End biome (BiomeMaker.end, with particles). */
 	public static final ResourceKey<Biome> VOID_MEADOW = key("void_meadow");
+	public static final ResourceKey<Biome> ASH_BARRENS = key("ash_barrens");
 	/** Compatibility tests: placed with TerraBlender / Biolith when those mods are installed. */
 	public static final ResourceKey<Biome> TB_MEADOW = key("tb_meadow");
 	public static final ResourceKey<Biome> BIOLITH_MEADOW = key("biolith_meadow");
@@ -50,6 +53,8 @@ public class BiomeTestMod implements ModInitializer {
 	public static final Identifier WARM = id("warm");
 	public static final Identifier MEADOWS = id("meadows");
 	public static final Identifier EMBERS = id("embers");
+	public static final Identifier WASTES = id("wastes");
+	public static final Identifier ASHLANDS = id("ashlands");
 
 	@Override
 	public void onInitialize() {
@@ -90,12 +95,32 @@ public class BiomeTestMod implements ModInitializer {
 				.replace(Biomes.CRIMSON_FOREST, EMBER_FOREST)
 				.addBiome(ClimatePoints.netherPoint(0.25F, -0.3F), EMBER_FOREST)
 				.register();
+		// Weighted: in this region's patches nether wastes become sulfur wastes or bone fields, 3 : 1.
+		BiomeRegion.builder(WASTES)
+				.nether()
+				.weight(4)
+				.replace(Biomes.NETHER_WASTES, net.biome.api.region.WeightedBiomes.builder()
+						.add(SULFUR_WASTES, 3)
+						.add(BONE_FIELDS, 1)
+						.build())
+				.register();
 		BiomeSurfaceRules.addNether(id("ember_floor"),
 				SurfaceRules.ifTrue(SurfaceRules.isBiome(EMBER_FOREST),
 						SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR, SurfaceRules.state(Blocks.MAGMA_BLOCK.defaultBlockState()))));
 
 		// ---- End: placed with Fabric API, plus a whole-biome swap from this API ----
 		TheEndBiomes.addHighlandsBiome(VOID_MEADOW, 10.0);
+		// End region: in its patches, barrens become ash barrens, and midlands in half of the patches.
+		BiomeRegion.builder(ASHLANDS)
+				.end()
+				.weight(5)
+				.replace(Biomes.END_BARRENS, ASH_BARRENS)
+				.replace(Biomes.END_MIDLANDS, ASH_BARRENS, 0.5F)
+				.register();
+		// End surface rule: the ground of ash barrens is smooth basalt instead of end stone.
+		BiomeSurfaceRules.addEnd(id("ash_floor"),
+				SurfaceRules.ifTrue(SurfaceRules.isBiome(ASH_BARRENS),
+						SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR, SurfaceRules.state(Blocks.SMOOTH_BASALT.defaultBlockState()))));
 		BiomeReplacements.replaceWholeBiome(Biomes.SMALL_END_ISLANDS, VOID_MEADOW, 1.0F);
 
 		if (net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("biolith")) {

@@ -46,6 +46,8 @@ import net.minecraft.world.level.biome.Biome;
 public final class BiomeReplacements {
 	private static final List<BiomeRegion.Replacement> REPLACEMENTS = new ArrayList<>();
 	private static final List<BiomeRegion.Replacement> WHOLE_BIOME = new ArrayList<>();
+	private static final java.util.Map<ResourceKey<Biome>, BiomeRegion.WeightedReplacement> WEIGHTED =
+			new java.util.TreeMap<>(Comparator.comparing((ResourceKey<Biome> k) -> k.identifier().toString()));
 	private static int patchSize = 6;
 	private static boolean frozen;
 
@@ -83,7 +85,41 @@ public final class BiomeReplacements {
 	 * {@code onInitialize()}.
 	 */
 	public static synchronized void replace(ResourceKey<Biome> original, ResourceKey<Biome> biome, float chance) {
+		if (WEIGHTED.containsKey(original)) {
+			throw new IllegalStateException(original.identifier() + " is already replaced with WeightedBiomes; use keepOriginal(...) and "
+					+ "add(...) there instead of mixing both");
+		}
 		add(REPLACEMENTS, "Replacement", original, biome, chance);
+	}
+
+	/**
+	 * <b>Everywhere</b>, {@code original} becomes one of several biomes picked by weight (in small cells, see
+	 * {@link WeightedBiomes}). No region needed; works in the Overworld, the Nether and the End:
+	 * <pre>{@code
+	 * BiomeReplacements.replace(Biomes.NETHER_WASTES, WeightedBiomes.builder()
+	 *         .add(ModBiomes.GRAVEL_DESERT, 2)
+	 *         .add(ModBiomes.MAGMA_LAND, 1)
+	 *         .keepOriginal(3)               // half of the nether wastes stay
+	 *         .build());
+	 * }</pre>
+	 * One original biome can have either this or {@link #replace(ResourceKey, ResourceKey, float)}, not both.
+	 */
+	public static synchronized void replace(ResourceKey<Biome> original, WeightedBiomes biomes) {
+		Objects.requireNonNull(original, "original");
+		Objects.requireNonNull(biomes, "biomes");
+		if (frozen) {
+			throw new IllegalStateException("Replacement of " + original.identifier() + " was registered too late: do it in onInitialize()");
+		}
+		if (WEIGHTED.containsKey(original) || REPLACEMENTS.stream().anyMatch(r -> r.original().equals(original))) {
+			throw new IllegalStateException(original.identifier() + " is already replaced (one original biome can have either "
+					+ "WeightedBiomes or replace(a, b, chance), not both)");
+		}
+		WEIGHTED.put(original, new BiomeRegion.WeightedReplacement(original, biomes, 1.0F));
+	}
+
+	/** All world-wide weighted replacements, sorted by original biome id. */
+	public static synchronized List<BiomeRegion.WeightedReplacement> getAllWeighted() {
+		return List.copyOf(WEIGHTED.values());
 	}
 
 	/** All area replacements, sorted by original biome id, then by replacement id (never by registration order). */
