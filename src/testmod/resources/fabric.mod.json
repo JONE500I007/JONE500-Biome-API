@@ -10,6 +10,9 @@
 		"main": [
 			"net.biome.testmod.BiomeTestMod"
 		],
+		"terrablender": [
+			"net.biome.testmod.compat.TerraBlenderCompat"
+		],
 		"fabric-datagen": [
 			"net.biome.testmod.BiomeTestModDataGen"
 		],
@@ -19,7 +22,8 @@
 		],
 		"fabric-client-gametest": [
 			"net.biome.testmod.BiomeClientGameTest",
-			"net.biome.testmod.BiomeWorldGenClientGameTest"
+			"net.biome.testmod.BiomeWorldGenClientGameTest",
+			"net.biome.testmod.BiomeCompatClientGameTest"
 		]
 	},
 	"depends": {

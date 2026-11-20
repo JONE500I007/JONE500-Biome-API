@@ -35,6 +35,9 @@ import net.minecraft.world.level.biome.BiomeSource;
 public class BiomeClientGameTest implements FabricClientGameTest {
 	@Override
 	public void runTest(ClientGameTestContext context) {
+		if (BiomeCompatClientGameTest.active()) {
+			return; // compatibility run: only BiomeCompatClientGameTest
+		}
 		try (TestSingleplayerContext world = context.worldBuilder()
 				.setUseConsistentSettings(false)
 				.adjustSettings(settings -> settings.setSeed("12345"))

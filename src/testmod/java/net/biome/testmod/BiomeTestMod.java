@@ -1,5 +1,6 @@
 package net.biome.testmod;
 
+import net.biome.api.JONE500BiomeAPI;
 import net.biome.api.climate.ClimatePoints;
 import net.biome.api.climate.Continentalness;
 import net.biome.api.climate.Erosion;
@@ -42,6 +43,9 @@ public class BiomeTestMod implements ModInitializer {
 	public static final ResourceKey<Biome> EMBER_FOREST = key("ember_forest");
 	/** End biome (BiomeMaker.end, with particles). */
 	public static final ResourceKey<Biome> VOID_MEADOW = key("void_meadow");
+	/** Compatibility tests: placed with TerraBlender / Biolith when those mods are installed. */
+	public static final ResourceKey<Biome> TB_MEADOW = key("tb_meadow");
+	public static final ResourceKey<Biome> BIOLITH_MEADOW = key("biolith_meadow");
 
 	public static final Identifier WARM = id("warm");
 	public static final Identifier MEADOWS = id("meadows");
@@ -49,6 +53,7 @@ public class BiomeTestMod implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
+		JONE500BiomeAPI.LOGGER.info("[compat-test] biome_test.compat = '{}'", System.getProperty("biome_test.compat", ""));
 		// Registered in "wrong" alphabetical order on purpose: the API must sort them by id.
 		BiomeRegion.builder(MEADOWS)
 				.weight(2)
@@ -91,6 +96,10 @@ public class BiomeTestMod implements ModInitializer {
 		// ---- End: placed with Fabric API, plus a whole-biome swap from this API ----
 		TheEndBiomes.addHighlandsBiome(VOID_MEADOW, 10.0);
 		BiomeReplacements.replaceWholeBiome(Biomes.SMALL_END_ISLANDS, VOID_MEADOW, 1.0F);
+
+		if (net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("biolith")) {
+			net.biome.testmod.compat.BiolithCompat.register();
+		}
 
 		BiomeSurfaceRules.addOverworld(id("red_plains_sand"),
 				SurfaceRules.ifTrue(SurfaceRules.isBiome(RED_PLAINS),

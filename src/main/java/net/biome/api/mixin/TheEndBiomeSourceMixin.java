@@ -6,10 +6,10 @@ import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 
 import net.biome.api.impl.BiomeApiBiomeSource;
 import net.biome.api.impl.RegionBiomeLookup;
@@ -20,9 +20,9 @@ import net.minecraft.world.level.biome.TheEndBiomeSource;
 
 /**
  * The End has no regions; only BiomeReplacements (area and whole-biome) are applied to the vanilla biome.
- * Fabric API's TheEndBiomes (modded End biomes with weights) still works for every biome we don't replace.
+ * Biomes placed by Fabric API's TheEndBiomes (or other mods) can be replaced too.
  */
-@Mixin(value = TheEndBiomeSource.class, priority = 900)
+@Mixin(TheEndBiomeSource.class)
 public abstract class TheEndBiomeSourceMixin implements BiomeApiBiomeSource {
 	@Unique
 	private volatile @Nullable RegionBiomeLookup jone500$lookup;
@@ -43,19 +43,14 @@ public abstract class TheEndBiomeSourceMixin implements BiomeApiBiomeSource {
 	}
 
 	/**
-	 * Fabric API's TheEndBiomes also changes the result at RETURN and returns early, so this runs first
-	 * (lower priority): if our replacement applies, it returns right away; otherwise Fabric gets its turn.
+	 * Wraps the whole method, including other mods' changes (Fabric API's TheEndBiomes, TerraBlender, ...), so
+	 * the replacements apply to the biome they finally chose.
 	 */
-	@Inject(method = "getNoiseBiome", at = @At("RETURN"), cancellable = true)
-	private void jone500$replace(int quartX, int quartY, int quartZ, Climate.Sampler sampler, CallbackInfoReturnable<Holder<Biome>> cir) {
+	@WrapMethod(method = "getNoiseBiome")
+	private Holder<Biome> jone500$replace(int quartX, int quartY, int quartZ, Climate.Sampler sampler, Operation<Holder<Biome>> original) {
+		Holder<Biome> biome = original.call(quartX, quartY, quartZ, sampler);
 		RegionBiomeLookup lookup = jone500$lookup;
-		if (lookup != null) {
-			Holder<Biome> original = cir.getReturnValue();
-			Holder<Biome> replaced = lookup.applyGlobalReplacements(original, quartX, quartZ);
-			if (replaced != original) {
-				cir.setReturnValue(replaced);
-			}
-		}
+		return lookup == null ? biome : lookup.applyGlobalReplacements(biome, quartX, quartZ);
 	}
 
 	@ModifyReturnValue(method = "collectPossibleBiomes", at = @At("RETURN"))

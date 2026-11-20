@@ -253,6 +253,11 @@ public final class RegionBiomeLookup {
 		return entry.original != null ? entry.original : vanilla.findValue(target);
 	}
 
+	/** True if this spot belongs to no region (vanilla, or whatever other mods place there). */
+	public boolean isVanillaCell(int quartX, int quartZ) {
+		return layout.cellAt(quartX, quartZ).region() == RegionLayout.VANILLA;
+	}
+
 	/** World-wide replacements only (also used for the End, which has no regions). */
 	public Holder<Biome> applyGlobalReplacements(Holder<Biome> biome, int quartX, int quartZ) {
 		if ((globalReplacements.isEmpty() && wholeBiomeSwaps.isEmpty()) || !(biome instanceof Holder.Reference<Biome> ref)) {

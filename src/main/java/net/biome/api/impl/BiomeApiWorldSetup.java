@@ -148,8 +148,12 @@ public final class BiomeApiWorldSetup {
 
 	private static void refreshPossibleBiomes(BiomeSource biomeSource, ChunkGenerator generator) {
 		BiomeSourceAccessor sourceAccess = (BiomeSourceAccessor) biomeSource;
-		sourceAccess.jone500$setPossibleBiomes(Suppliers.memoize(
-				() -> sourceAccess.jone500$collectPossibleBiomes().distinct().collect(ImmutableSet.toImmutableSet())));
+		// Keep what is already in the list: other mods (TerraBlender) add their biomes to it directly.
+		Set<Holder<Biome>> before = biomeSource.possibleBiomes();
+		sourceAccess.jone500$setPossibleBiomes(Suppliers.memoize(() -> ImmutableSet.<Holder<Biome>>builder()
+				.addAll(before)
+				.addAll(sourceAccess.jone500$collectPossibleBiomes().iterator())
+				.build()));
 
 		ChunkGeneratorAccessor generatorAccess = (ChunkGeneratorAccessor) generator;
 		var settingsGetter = generatorAccess.jone500$getGenerationSettingsGetter();

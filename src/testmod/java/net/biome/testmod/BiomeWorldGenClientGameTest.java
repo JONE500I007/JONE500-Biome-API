@@ -46,6 +46,9 @@ public class BiomeWorldGenClientGameTest implements FabricClientGameTest {
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
+		if (BiomeCompatClientGameTest.active()) {
+			return; // compatibility run: only BiomeCompatClientGameTest
+		}
 		TestWorldSave save;
 		Map<BlockPos, String> remembered;
 

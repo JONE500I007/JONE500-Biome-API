@@ -48,6 +48,21 @@ import net.minecraft.world.level.levelgen.RandomState;
  * <p>Run with: gradlew runGameTest
  */
 public class BiomeServerGameTest {
+	/** Biome mods (Lithostitched, TerraBlender, ...) add points to the vanilla climate lists, so vanilla biomes get rarer. */
+	private static final boolean OTHER_WORLDGEN_MODS = !System.getProperty("biome_test.compat", "").isEmpty();
+
+	/** Lithostitched wraps the biome source in its own (InjectorBiomeSource) that calls the original; find the original. */
+	static BiomeApiBiomeSource apiSource(BiomeSource source) {
+		if (source instanceof BiomeApiBiomeSource api) {
+			return api;
+		}
+		try {
+			return apiSource((BiomeSource) source.getClass().getMethod("rootDelegate").invoke(source));
+		} catch (ReflectiveOperationException e) {
+			throw new IllegalStateException("unknown biome source " + source.getClass().getName(), e);
+		}
+	}
+
 	private static final long SEED = 12345L;
 
 	/** Regions must be used sorted by id, not in registration order (testmod registers meadows first). */
@@ -322,7 +337,7 @@ public class BiomeServerGameTest {
 		double share = (double) replaced / birch;
 		JONE500BiomeAPI.LOGGER.info("[test] world-wide replacement: {} of {} birch forest samples replaced ({}%), {} patches",
 				replaced, birch, Math.round(share * 100), patches.size());
-		ctx.assertTrue(birch > 500, Component.literal("too few birch forest samples: " + birch));
+		ctx.assertTrue(birch > (OTHER_WORLDGEN_MODS ? 100 : 500), Component.literal("too few birch forest samples: " + birch));
 		ctx.assertTrue(Math.abs(share - 0.4) < 0.1, Component.literal("replaced share " + share + ", expected about 0.4"));
 		ctx.succeed();
 	}
@@ -383,7 +398,7 @@ public class BiomeServerGameTest {
 		ServerLevel nether = ctx.getLevel().getServer().getLevel(Level.NETHER);
 		ctx.assertTrue(nether != null, Component.literal("no Nether level"));
 		BiomeSource source = nether.getChunkSource().getGenerator().getBiomeSource();
-		RegionBiomeLookup lookup = ((BiomeApiBiomeSource) source).jone500$getLookup();
+		RegionBiomeLookup lookup = apiSource(source).jone500$getLookup();
 		ctx.assertTrue(lookup != null, Component.literal("the Nether got no region lookup"));
 		Climate.Sampler sampler = nether.getChunkSource().randomState().sampler();
 		int ember = 0;

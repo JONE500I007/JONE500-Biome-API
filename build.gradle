@@ -5,7 +5,7 @@ plugins {
 
 // Version = mod version + Minecraft version, e.g. 0.1.0+26.1, so the builds for different
 // Minecraft versions never share a version number (on Modrinth or in the jar name).
-version = "${project.mod_version}+${project.minecraft_version}"
+version = "${project.mod_version}+${project.minecraft_version_name}"
 
 base {
 	archivesName = project.archives_base_name
@@ -13,6 +13,18 @@ base {
 
 repositories {
 	// Loom adds the repositories needed for Minecraft, Fabric Loader and Fabric API automatically.
+	// Modrinth: other mods for the compatibility tests (see "compat" below). Dev only.
+	exclusiveContent {
+		forRepository {
+			maven {
+				name = "Modrinth"
+				url = "https://api.modrinth.com/maven"
+			}
+		}
+		filter {
+			includeGroup "maven.modrinth"
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -138,5 +150,63 @@ publishing {
 	}
 
 	repositories {
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Compatibility tests with other mods (dev only, never in the published jar).
+// Run with a group name, for example:
+//   gradlew runClientGameTest -Pcompat=apis
+//   gradlew runClientGameTest -Pcompat=all
+// The testmod then also registers a biome through TerraBlender and through Biolith (when they are
+// loaded), and BiomeCompatClientGameTest checks that everything works together.
+// ---------------------------------------------------------------------------
+// Modrinth version IDs (not version numbers) where one number has files for several loaders.
+def compatMods = [
+	terrablender : "maven.modrinth:terrablender:NIXt6lha",
+	biolith      : "maven.modrinth:biolith:xRtx6rPH",
+	bop          : "maven.modrinth:biomes-o-plenty:8MVwdPgG",
+	glitchcore   : "maven.modrinth:glitchcore:WNtSATXw", // required by Biomes O' Plenty
+	terralith    : "maven.modrinth:terralith:FCzSjHeG",
+	lithostitched: "maven.modrinth:lithostitched:1.8.1-fabric-26.1",
+	tectonic     : "maven.modrinth:tectonic:3.0.28-fabric-26.1",
+	ru           : "maven.modrinth:regions-unexplored:0.7.0+beta4-fabric-26.1",
+	c2me         : "maven.modrinth:c2me-fabric:0.4.0-alpha.0.75+26.1.2",
+	lithium      : "maven.modrinth:lithium:mc26.1.2-0.24.7-fabric",
+	sodium       : "maven.modrinth:sodium:mc26.1.2-0.9.2-fabric",
+	ferritecore  : "maven.modrinth:ferrite-core:9.0.0-fabric",
+	chunky       : "maven.modrinth:chunky:86FKD9qx",
+	dh           : "maven.modrinth:distanthorizons:3.3.3-26.1.2",
+]
+def compatGroups = [
+	apis     : ["terrablender", "biolith"],
+	bop      : ["terrablender", "glitchcore", "bop"],
+	terralith: ["terralith", "lithostitched"],
+	tectonic : ["tectonic", "lithostitched"],
+	ru       : ["ru", "lithostitched"],
+	perf     : ["c2me", "lithium", "sodium", "ferritecore"],
+	chunky   : ["chunky"],
+	dh       : ["dh"],
+]
+compatGroups.all = compatMods.keySet() as List
+
+def compat = (findProperty("compat") ?: "").toString().split(",")*.trim().findAll { it }
+def compatSelected = compat.collectMany { name ->
+	if (!compatGroups.containsKey(name) && !compatMods.containsKey(name)) {
+		throw new GradleException("Unknown compat group '${name}'. Use one of: ${compatGroups.keySet() + compatMods.keySet()}")
+	}
+	compatGroups[name] ?: [name]
+}.unique()
+
+dependencies {
+	// The testmod uses the TerraBlender and Biolith APIs (only when those mods are loaded).
+	testmodCompileOnly compatMods.terrablender
+	testmodCompileOnly compatMods.biolith
+	compatSelected.each { testmodRuntimeOnly compatMods[it] }
+}
+
+loom.runs.configureEach {
+	if (!compat.isEmpty()) {
+		vmArg "-Dbiome_test.compat=${compat.join(',')}"
 	}
 }

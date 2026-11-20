@@ -10,9 +10,10 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 
 import net.biome.api.impl.BiomeApiBiomeSource;
 import net.biome.api.impl.RegionBiomeLookup;
@@ -47,14 +48,23 @@ public abstract class MultiNoiseBiomeSourceMixin implements BiomeApiBiomeSource 
 		return parameters();
 	}
 
-	/** Every biome lookup of this source (chunk generation, /locate, F3) goes through here. */
-	@Inject(method = "getNoiseBiome(IIILnet/minecraft/world/level/biome/Climate$Sampler;)Lnet/minecraft/core/Holder;",
-			at = @At("HEAD"), cancellable = true)
-	private void jone500$regionBiome(int quartX, int quartY, int quartZ, Climate.Sampler sampler, CallbackInfoReturnable<Holder<Biome>> cir) {
+	/**
+	 * Every biome lookup of this source (chunk generation, /locate, F3) goes through here.
+	 *
+	 * <p>Wraps the whole method, including other mods' changes (TerraBlender, Biolith, ...): spots that belong to
+	 * one of our regions get our biome; every other spot is left to the original method (vanilla or the other
+	 * mods), and only our world-wide replacements are applied to its result.
+	 */
+	@WrapMethod(method = "getNoiseBiome(IIILnet/minecraft/world/level/biome/Climate$Sampler;)Lnet/minecraft/core/Holder;")
+	private Holder<Biome> jone500$regionBiome(int quartX, int quartY, int quartZ, Climate.Sampler sampler, Operation<Holder<Biome>> original) {
 		RegionBiomeLookup lookup = jone500$lookup;
-		if (lookup != null) {
-			cir.setReturnValue(lookup.getBiome(sampler.sample(quartX, quartY, quartZ), quartX, quartZ, parameters()));
+		if (lookup == null) {
+			return original.call(quartX, quartY, quartZ, sampler);
 		}
+		if (!lookup.isVanillaCell(quartX, quartZ)) {
+			return lookup.getBiome(sampler.sample(quartX, quartY, quartZ), quartX, quartZ, parameters());
+		}
+		return lookup.applyGlobalReplacements(original.call(quartX, quartY, quartZ, sampler), quartX, quartZ);
 	}
 
 	/** Region biomes are possible biomes too (features and structures need this). */
