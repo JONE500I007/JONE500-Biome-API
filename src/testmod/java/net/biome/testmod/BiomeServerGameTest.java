@@ -52,6 +52,20 @@ public class BiomeServerGameTest {
 	private static final boolean OTHER_WORLDGEN_MODS = !System.getProperty("biome_test.compat", "").isEmpty();
 
 	/** Lithostitched wraps the biome source in its own (InjectorBiomeSource) that calls the original; find the original. */
+	/**
+	 * Since Minecraft 26.3 the game test server uses one fixed biome in every dimension (not only the Overworld), so
+	 * tests that need the real Nether or End can't run there. They pass with a note; the client game test checks the
+	 * same things in a real world.
+	 */
+	private static boolean skipIfFixed(GameTestHelper ctx, BiomeSource source) {
+		if (source instanceof net.minecraft.world.level.biome.FixedBiomeSource) {
+			JONE500BiomeAPI.LOGGER.info("[test] skipped on the test server (fixed biome in this dimension), checked by the client game test");
+			ctx.succeed();
+			return true;
+		}
+		return false;
+	}
+
 	static BiomeApiBiomeSource apiSource(BiomeSource source) {
 		if (source instanceof BiomeApiBiomeSource api) {
 			return api;
@@ -314,7 +328,7 @@ public class BiomeServerGameTest {
 	public void featureOrderRules(GameTestHelper ctx) {
 		RegistryAccess registries = ctx.getLevel().registryAccess();
 		var placed = registries.lookupOrThrow(Registries.PLACED_FEATURE);
-		var carvers = registries.lookupOrThrow(Registries.CONFIGURED_CARVER);
+		var carvers = registries.lookupOrThrow(Registries.CARVER);
 		Biome plains = registries.lookupOrThrow(Registries.BIOME).getValueOrThrow(Biomes.PLAINS);
 
 		Biome doubleDiamonds = net.biome.api.biome.BiomeMaker.overworld(placed, carvers)
@@ -373,7 +387,7 @@ public class BiomeServerGameTest {
 		RegistryAccess registries = ctx.getLevel().registryAccess();
 		Climate.ParameterList<Holder<Biome>> vanilla = registries.lookupOrThrow(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST)
 				.getOrThrow(MultiNoiseBiomeSourceParameterLists.OVERWORLD).value().parameters();
-		Climate.Sampler sampler = RandomState.create(registries, NoiseGeneratorSettings.OVERWORLD, SEED).sampler();
+		Climate.Sampler sampler = TestWorldgen.sampler(TestWorldgen.randomState(registries, NoiseGeneratorSettings.OVERWORLD, SEED));
 		List<BiomeRegion.Replacement> replacements = List.of(new BiomeRegion.Replacement(BiomeTestMod.RED_PLAINS, BiomeTestMod.ORANGE_HILLS, 0.5F));
 		RegionBiomeLookup without = RegionBiomeLookup.create(SEED, BiomeRegions.getRegionSize(), BiomeRegions.getVanillaWeight(),
 				new ArrayList<>(BiomeRegions.getAll(RegionDimension.OVERWORLD)), List.of(), BiomeReplacements.getPatchSize(), List.of(), SEED,
@@ -413,7 +427,7 @@ public class BiomeServerGameTest {
 		RegistryAccess registries = ctx.getLevel().registryAccess();
 		Climate.ParameterList<Holder<Biome>> vanilla = registries.lookupOrThrow(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST)
 				.getOrThrow(MultiNoiseBiomeSourceParameterLists.OVERWORLD).value().parameters();
-		Climate.Sampler sampler = RandomState.create(registries, NoiseGeneratorSettings.OVERWORLD, SEED).sampler();
+		Climate.Sampler sampler = TestWorldgen.sampler(TestWorldgen.randomState(registries, NoiseGeneratorSettings.OVERWORLD, SEED));
 		RegionBiomeLookup lookup = RegionBiomeLookup.create(SEED, BiomeRegions.getRegionSize(), BiomeRegions.getVanillaWeight(), List.of(),
 				List.of(new BiomeRegion.Replacement(Biomes.DESERT, Biomes.SAVANNA, 0.5F)), BiomeReplacements.getPatchSize(), List.of(), SEED,
 				vanilla, registries.lookupOrThrow(Registries.BIOME));
@@ -509,7 +523,7 @@ public class BiomeServerGameTest {
 		RegistryAccess registries = ctx.getLevel().registryAccess();
 		Climate.ParameterList<Holder<Biome>> vanilla = registries.lookupOrThrow(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST)
 				.getOrThrow(MultiNoiseBiomeSourceParameterLists.OVERWORLD).value().parameters();
-		Climate.Sampler sampler = RandomState.create(registries, NoiseGeneratorSettings.OVERWORLD, SEED).sampler();
+		Climate.Sampler sampler = TestWorldgen.sampler(TestWorldgen.randomState(registries, NoiseGeneratorSettings.OVERWORLD, SEED));
 		// vanilla weight 0: the whole world is this region
 		RegionBiomeLookup lookup = RegionBiomeLookup.create(SEED, 7, 0.0F, List.of(region), vanilla, registries.lookupOrThrow(Registries.BIOME));
 		long inlandMin = Climate.quantizeCoord(-0.11F);
@@ -536,16 +550,19 @@ public class BiomeServerGameTest {
 		ServerLevel nether = ctx.getLevel().getServer().getLevel(Level.NETHER);
 		ctx.assertTrue(nether != null, Component.literal("no Nether level"));
 		BiomeSource source = nether.getChunkSource().getGenerator().getBiomeSource();
+		if (skipIfFixed(ctx, source)) {
+			return;
+		}
 		RegionBiomeLookup lookup = apiSource(source).jone500$getLookup();
 		ctx.assertTrue(lookup != null, Component.literal("the Nether got no region lookup"));
-		Climate.Sampler sampler = nether.getChunkSource().randomState().sampler();
+		Climate.Sampler sampler = TestWorldgen.sampler(nether.getChunkSource().randomState());
 		int ember = 0;
 		int crimson = 0;
 		for (int i = 0; i < 150; i++) {
 			for (int j = 0; j < 150; j++) {
 				int qx = (i - 75) * 24;
 				int qz = (j - 75) * 24;
-				Holder<Biome> biome = source.getNoiseBiome(qx, 16, qz, sampler);
+				Holder<Biome> biome = TestWorldgen.biome(source, qx, 16, qz, sampler);
 				if (biome.is(BiomeTestMod.EMBER_FOREST)) {
 					ember++;
 					BiomeRegion region = lookup.getRegionAt(qx, qz);
@@ -572,13 +589,16 @@ public class BiomeServerGameTest {
 		ServerLevel end = ctx.getLevel().getServer().getLevel(Level.END);
 		ctx.assertTrue(end != null, Component.literal("no End level"));
 		BiomeSource source = end.getChunkSource().getGenerator().getBiomeSource();
-		Climate.Sampler sampler = end.getChunkSource().randomState().sampler();
+		if (skipIfFixed(ctx, source)) {
+			return;
+		}
+		Climate.Sampler sampler = TestWorldgen.sampler(end.getChunkSource().randomState());
 		Map<ResourceKey<Biome>, Integer> counts = new HashMap<>();
 		for (int i = 0; i < 120; i++) {
 			for (int j = 0; j < 120; j++) {
 				int qx = 400 + i * 40; // far from the main island (1600+ blocks)
 				int qz = (j - 60) * 40;
-				counts.merge(source.getNoiseBiome(qx, 16, qz, sampler).unwrapKey().orElseThrow(), 1, Integer::sum);
+				counts.merge(TestWorldgen.biome(source, qx, 16, qz, sampler).unwrapKey().orElseThrow(), 1, Integer::sum);
 			}
 		}
 		JONE500BiomeAPI.LOGGER.info("[test] end: {}", counts);
@@ -598,9 +618,12 @@ public class BiomeServerGameTest {
 		ServerLevel end = ctx.getLevel().getServer().getLevel(Level.END);
 		ctx.assertTrue(end != null, Component.literal("no End level"));
 		BiomeSource source = end.getChunkSource().getGenerator().getBiomeSource();
+		if (skipIfFixed(ctx, source)) {
+			return;
+		}
 		RegionBiomeLookup lookup = apiSource(source).jone500$getLookup();
 		ctx.assertTrue(lookup != null, Component.literal("the End got no region lookup"));
-		Climate.Sampler sampler = end.getChunkSource().randomState().sampler();
+		Climate.Sampler sampler = TestWorldgen.sampler(end.getChunkSource().randomState());
 		int ash = 0;
 		int ashOutside = 0;
 		int barrensInside = 0;
@@ -611,7 +634,7 @@ public class BiomeServerGameTest {
 			for (int j = 0; j < 160; j++) {
 				int qx = 400 + i * 32; // far from the main island
 				int qz = (j - 80) * 32;
-				Holder<Biome> biome = source.getNoiseBiome(qx, 16, qz, sampler);
+				Holder<Biome> biome = TestWorldgen.biome(source, qx, 16, qz, sampler);
 				BiomeRegion region = lookup.getRegionAt(qx, qz);
 				boolean inside = region != null && region.getId().equals(BiomeTestMod.ASHLANDS);
 				if (inside) regionSamples++;
@@ -660,7 +683,10 @@ public class BiomeServerGameTest {
 		ServerLevel end = ctx.getLevel().getServer().getLevel(Level.END);
 		ctx.assertTrue(end != null, Component.literal("no End level"));
 		BiomeSource source = end.getChunkSource().getGenerator().getBiomeSource();
-		Climate.Sampler sampler = end.getChunkSource().randomState().sampler();
+		if (skipIfFixed(ctx, source)) {
+			return;
+		}
+		Climate.Sampler sampler = TestWorldgen.sampler(end.getChunkSource().randomState());
 		Map<String, Integer> ashTops = new HashMap<>();
 		Map<String, Integer> barrensTops = new HashMap<>();
 		int checkedChunks = 0;
@@ -668,7 +694,7 @@ public class BiomeServerGameTest {
 			for (int j = 0; j < 80 && checkedChunks < 24; j++) {
 				int qx = 400 + i * 32;
 				int qz = (j - 40) * 32;
-				Holder<Biome> biome = source.getNoiseBiome(qx, 16, qz, sampler);
+				Holder<Biome> biome = TestWorldgen.biome(source, qx, 16, qz, sampler);
 				boolean ash = biome.is(BiomeTestMod.ASH_BARRENS);
 				if (!ash && !(biome.is(Biomes.END_BARRENS) && barrensTops.values().stream().mapToInt(Integer::intValue).sum() < 200)) {
 					continue;
@@ -711,7 +737,7 @@ public class BiomeServerGameTest {
 		RegistryAccess registries = ctx.getLevel().registryAccess();
 		Climate.ParameterList<Holder<Biome>> vanilla = registries.lookupOrThrow(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST)
 				.getOrThrow(MultiNoiseBiomeSourceParameterLists.OVERWORLD).value().parameters();
-		Climate.Sampler sampler = RandomState.create(registries, NoiseGeneratorSettings.OVERWORLD, SEED).sampler();
+		Climate.Sampler sampler = TestWorldgen.sampler(TestWorldgen.randomState(registries, NoiseGeneratorSettings.OVERWORLD, SEED));
 		BiomeRegion region = BiomeRegion.builder(BiomeTestMod.id("weighted_test"))
 				.replace(Biomes.PLAINS, net.biome.api.region.WeightedBiomes.builder()
 						.add(BiomeTestMod.RED_PLAINS, 5)
@@ -751,7 +777,7 @@ public class BiomeServerGameTest {
 		RegistryAccess registries = ctx.getLevel().registryAccess();
 		Climate.ParameterList<Holder<Biome>> vanilla = registries.lookupOrThrow(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST)
 				.getOrThrow(MultiNoiseBiomeSourceParameterLists.OVERWORLD).value().parameters();
-		Climate.Sampler sampler = RandomState.create(registries, NoiseGeneratorSettings.OVERWORLD, SEED).sampler();
+		Climate.Sampler sampler = TestWorldgen.sampler(TestWorldgen.randomState(registries, NoiseGeneratorSettings.OVERWORLD, SEED));
 		net.biome.api.region.WeightedBiomes weighted = net.biome.api.region.WeightedBiomes.builder()
 				.add(Biomes.SAVANNA, 1)
 				.add(Biomes.BADLANDS, 1)
@@ -821,8 +847,11 @@ public class BiomeServerGameTest {
 		ServerLevel nether = ctx.getLevel().getServer().getLevel(Level.NETHER);
 		ctx.assertTrue(nether != null, Component.literal("no Nether level"));
 		BiomeSource source = nether.getChunkSource().getGenerator().getBiomeSource();
+		if (skipIfFixed(ctx, source)) {
+			return;
+		}
 		RegionBiomeLookup lookup = apiSource(source).jone500$getLookup();
-		Climate.Sampler sampler = nether.getChunkSource().randomState().sampler();
+		Climate.Sampler sampler = TestWorldgen.sampler(nether.getChunkSource().randomState());
 		int sulfur = 0;
 		int bone = 0;
 		int wastesInside = 0;
@@ -831,7 +860,7 @@ public class BiomeServerGameTest {
 			for (int j = 0; j < 200; j++) {
 				int qx = (i - 100) * 16;
 				int qz = (j - 100) * 16;
-				Holder<Biome> biome = source.getNoiseBiome(qx, 16, qz, sampler);
+				Holder<Biome> biome = TestWorldgen.biome(source, qx, 16, qz, sampler);
 				BiomeRegion region = lookup.getRegionAt(qx, qz);
 				boolean inside = region != null && region.getId().equals(BiomeTestMod.WASTES);
 				if (biome.is(BiomeTestMod.SULFUR_WASTES) || biome.is(BiomeTestMod.BONE_FIELDS)) {
@@ -899,11 +928,11 @@ public class BiomeServerGameTest {
 			RegistryAccess registries = ctx.getLevel().registryAccess();
 			Climate.ParameterList<Holder<Biome>> vanilla = registries.lookupOrThrow(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST)
 					.getOrThrow(MultiNoiseBiomeSourceParameterLists.OVERWORLD).value().parameters();
-			RandomState randomState = RandomState.create(registries, NoiseGeneratorSettings.OVERWORLD, seed);
+			RandomState randomState = TestWorldgen.randomState(registries, NoiseGeneratorSettings.OVERWORLD, seed);
 			RegionBiomeLookup lookup = RegionBiomeLookup.create(seed, BiomeRegions.getRegionSize(), BiomeRegions.getVanillaWeight(),
 					new ArrayList<>(BiomeRegions.getAll(RegionDimension.OVERWORLD)), BiomeReplacements.getAll(), BiomeReplacements.getPatchSize(), BiomeReplacements.getAllWholeBiome(), seed,
 					vanilla, registries.lookupOrThrow(Registries.BIOME));
-			return new World(randomState.sampler(), vanilla, lookup);
+			return new World(TestWorldgen.sampler(randomState), vanilla, lookup);
 		}
 
 		Holder<Biome> biomeAt(int qx, int qy, int qz) {

@@ -163,21 +163,21 @@ publishing {
 // ---------------------------------------------------------------------------
 // Modrinth version IDs (not version numbers) where one number has files for several loaders.
 def compatMods = [
-	// Minecraft 26.2 versions (Modrinth version ids where one version number has files for several loaders)
-	terrablender : "maven.modrinth:terrablender:KQix25Qc",          // 26.2.0.0.2
-	biolith      : "maven.modrinth:biolith:qSLRk6dS",               // 3.7.0-beta.1
-	bop          : "maven.modrinth:biomes-o-plenty:MNZPk6V0",       // 26.2.0.0.28
-	glitchcore   : "maven.modrinth:glitchcore:SDUCBYRU",            // 26.2.0.0.0, required by Biomes O' Plenty
-	terralith    : "maven.modrinth:terralith:OxfI2n80",             // 2.6.4
-	lithostitched: "maven.modrinth:lithostitched:sGGUpIGT",         // 1.8.0-fabric-26.2
-	tectonic     : "maven.modrinth:tectonic:tGbplDzo",              // 3.0.28-fabric-26.2
-	c2me         : "maven.modrinth:c2me-fabric:qwS7dYKj",           // 0.4.2-alpha.0.71+26.2
-	lithium      : "maven.modrinth:lithium:f7vZ0VWU",               // mc26.2-0.25.3-fabric
-	sodium       : "maven.modrinth:sodium:xJZxADzI",                // mc26.2-0.9.2-fabric
+	// Minecraft 26.3 versions (Modrinth version ids where one version number has files for several loaders)
+	terrablender : "maven.modrinth:terrablender:xirJYe1V",          // 26.3.0.0.9
+	biolith      : "maven.modrinth:biolith:F5nTRwpV",               // 3.8.0-beta.2
+	bop          : "maven.modrinth:biomes-o-plenty:sbAVJ5Mn",       // 26.3.0.0.16
+	glitchcore   : "maven.modrinth:glitchcore:kfFeDnrp",            // 26.3.0.0.5, required by Biomes O' Plenty
+	terralith    : "maven.modrinth:terralith:aGE3hYAA",             // 2.6.5+26.3
+	lithostitched: "maven.modrinth:lithostitched:pZgI6b2t",         // 2.0.6-fabric-26.3
+	tectonic     : "maven.modrinth:tectonic:rKBGygwM",              // 3.1.0+beta2-fabric-26.3
+	c2me         : "maven.modrinth:c2me-fabric:Qfm2hhas",           // 0.4.2-alpha.0.121+26.3
+	lithium      : "maven.modrinth:lithium:Lal8mJGR",               // mc26.3-0.26.4-fabric
+	sodium       : "maven.modrinth:sodium:v7Lw0h1m",                // mc26.3-0.9.3-beta.5-fabric
 	ferritecore  : "maven.modrinth:ferrite-core:d5ddUdiB",          // 9.0.0-fabric
 	chunky       : "maven.modrinth:chunky:86FKD9qx",                // 1.5.66
-	dh           : "maven.modrinth:distanthorizons:aAow4a9f",       // 3.3.3-26.2
-	// Regions Unexplored has no 26.2 version yet (tested on the 26.1 branch).
+	dh           : "maven.modrinth:distanthorizons:TGgEbP9A",       // 3.3.4-26.3
+	// Regions Unexplored has no 26.3 version yet (tested on the 26.1 branch).
 ]
 def compatGroups = [
 	apis     : ["terrablender", "biolith"],

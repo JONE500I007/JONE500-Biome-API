@@ -72,8 +72,8 @@ public class BiomeWorldGenClientGameTest implements FabricClientGameTest {
 					String now = level.getBiome(pos).getRegisteredName();
 					check(now.equals(entry.getValue()), "after reopening, " + pos + " is " + now + " instead of " + entry.getValue());
 					// Also freshly computed (not only what the chunk saved):
-					String computed = level.getChunkSource().getGenerator().getBiomeSource()
-							.getNoiseBiome(pos.getX() >> 2, pos.getY() >> 2, pos.getZ() >> 2, level.getChunkSource().randomState().sampler())
+					String computed = TestWorldgen.biome(level.getChunkSource().getGenerator().getBiomeSource(),
+							pos.getX() >> 2, pos.getY() >> 2, pos.getZ() >> 2, TestWorldgen.sampler(level.getChunkSource().randomState()))
 							.getRegisteredName();
 					check(computed.equals(entry.getValue()), "after reopening, " + pos + " computes " + computed + " instead of " + entry.getValue());
 				}
@@ -102,7 +102,7 @@ public class BiomeWorldGenClientGameTest implements FabricClientGameTest {
 					String found = "-";
 					if (multiNoise) {
 						Pair<BlockPos, Holder<Biome>> red = source.findClosestBiome3d(BlockPos.ZERO.atY(80), 6400, 64, 64,
-								b -> b.is(BiomeTestMod.RED_PLAINS), overworld.getChunkSource().randomState().sampler(), overworld);
+								b -> b.is(BiomeTestMod.RED_PLAINS), overworld.getChunkSource().randomState(), overworld);
 						found = red == null ? "not within 6400 blocks" : red.getFirst().toShortString();
 					}
 					JONE500BiomeAPI.LOGGER.info("[worldgen-test] {}: OK (regions {}, red plains at {})", preset.identifier(), hasRegions, found);
@@ -210,6 +210,29 @@ public class BiomeWorldGenClientGameTest implements FabricClientGameTest {
 		check(smallIslands == 0, "small end islands still in generated End chunks: " + smallIslands);
 		remember(remembered, end, islands, new BlockPos(0, 64, 0));
 
+		// Weighted Nether region: both biomes of WeightedBiomes appear (also checked on the test server before 26.3)
+		findAny(nether, BiomeTestMod.SULFUR_WASTES, 64);
+		findAny(nether, BiomeTestMod.BONE_FIELDS, 64);
+
+		// End region + End surface rule: ash barrens exists and its ground is smooth basalt
+		BlockPos ash = findAny(end, BiomeTestMod.ASH_BARRENS, 64);
+		int basalt = 0;
+		for (ChunkAccess chunk : generate(end, ash)) {
+			BlockPos base = chunk.getPos().getWorldPosition();
+			for (int x = 0; x < 16; x += 2) {
+				for (int z = 0; z < 16; z += 2) {
+					for (int y = 0; y < 120; y++) {
+						BlockPos pos = base.offset(x, y, z);
+						if (end.getBlockState(pos).is(Blocks.SMOOTH_BASALT) && end.getBiome(pos).is(BiomeTestMod.ASH_BARRENS)) {
+							basalt++;
+						}
+					}
+				}
+			}
+		}
+		check(basalt > 20, "ash barrens End surface rule: only " + basalt + " smooth basalt blocks found");
+		JONE500BiomeAPI.LOGGER.info("[worldgen-test] End region: ash barrens at {}, {} smooth basalt blocks; weighted Nether biomes found", ash, basalt);
+
 		JONE500BiomeAPI.LOGGER.info("[worldgen-test] generated {} chunks in 3 dimensions in {} s: red plains columns {} (red sand {}), "
 						+ "ember magma {}, end void meadow {} / small islands {}",
 				redChunks.size() * 2 + emberChunks.size() + endChunks.size(), (System.currentTimeMillis() - start) / 1000,
@@ -239,7 +262,7 @@ public class BiomeWorldGenClientGameTest implements FabricClientGameTest {
 	private static BlockPos findAny(ServerLevel level, ResourceKey<Biome> biome, int y) {
 		BiomeSource source = level.getChunkSource().getGenerator().getBiomeSource();
 		Pair<BlockPos, Holder<Biome>> found = source.findClosestBiome3d(new BlockPos(0, y, 0), 6400, 32, 64, b -> b.is(biome),
-				level.getChunkSource().randomState().sampler(), level);
+				level.getChunkSource().randomState(), level);
 		check(found != null, "could not find " + biome.identifier() + " in " + level.dimension().identifier());
 		return found.getFirst();
 	}

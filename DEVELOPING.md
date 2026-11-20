@@ -48,10 +48,17 @@ Reference clones of TerraBlender and Biolith are in `D:\minecraft modding\biome-
 
 ## Minecraft versions
 
-Planned: 26.1, 26.2, 26.3 (one git branch each, like Wooden API).
-**26.2/26.3 differ:** `MultiNoiseBiomeSource` resolves biomes in lambdas (`createResolver...`) instead of
-`getNoiseBiome(x, y, z, sampler)`, and surface rules appear to be renamed to "material rules". The
-mixins must be rewritten for those branches.
+Branches 26.1, 26.2 and 26.3 (one git branch each, like Wooden API). What differs:
+
+| | 26.1 | 26.2 | 26.3 |
+|---|---|---|---|
+| Biome lookup (main mixin) | `@WrapMethod getNoiseBiome(x, y, z, sampler)` | same | `@WrapMethod createResolver` / `createResolverForChunk`; the returned `BiomeResolver` is wrapped |
+| Surface rules | `SurfaceRules`, `addOverworld(id, rule)` | `isBiome` needs the biome registry: `addOverworld(id, biomes -> rule)` | `MaterialRules` (data-driven): `addOverworld(id, ctx -> rule)` with `SurfaceRuleContext` |
+| Surface mixin target | `buildSurface(..., Registry, Blender)` + `applyCarvers` | `buildSurface(..., Blender, Set)` + `applyCarvers` | `@ModifyVariable` on the `MaterialRule` argument of `buildSurface` + `generateCarvers` |
+| Mobs / colors / carvers | `EntityType.X`, int colors, `ConfiguredWorldCarver` | `EntityTypes.X` | + `IntProvider` group sizes, `Vector3fc` colors, `WorldCarver`, animal chance is an attribute |
+| Game test server | Nether and End are real | same | **every** dimension uses a fixed biome: Nether/End tests skip there and the client game test covers them |
+
+Regions Unexplored has no 26.2/26.3 build yet, so it is only in the 26.1 compat tests.
 
 ### Vanilla data copied into the code (redo for every Minecraft branch)
 

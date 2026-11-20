@@ -1,6 +1,6 @@
 # JONE500 Biome API
 
-A Fabric library for **Minecraft 26.2** that adds your Overworld, Nether and End biomes in **regions**:
+A Fabric library for **Minecraft 26.3** that adds your Overworld, Nether and End biomes in **regions**:
 
 - **Deterministic:** regions are sorted by id, so the same seed always gives the same world, no matter
   in which order mods load.
@@ -32,7 +32,7 @@ repositories {
 }
 
 dependencies {
-    implementation "maven.modrinth:jone500-biome-api:1.0.0+26.2"
+    implementation "maven.modrinth:jone500-biome-api:1.0.0+26.3"
 }
 ```
 
@@ -407,37 +407,47 @@ to snowy plains looks wrong. A biome can only get more common by taking area fro
 ## 4. Surface rules (optional)
 
 ```java
-BiomeSurfaceRules.addOverworld(Identifier.fromNamespaceAndPath("mymod", "surface"), biomes ->
-        SurfaceRules.ifTrue(SurfaceRules.isBiome(biomes, ModBiomes.APPLE_GROVE),
-                SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
-                        SurfaceRules.state(Blocks.COARSE_DIRT.defaultBlockState()))));
+BiomeSurfaceRules.addOverworld(Identifier.fromNamespaceAndPath("mymod", "surface"), ctx ->
+        MaterialRules.ifTrue(ctx.isBiome(ModBiomes.APPLE_GROVE),
+                MaterialRules.ifTrue(ctx.onFloor(),
+                        MaterialRules.state(Blocks.COARSE_DIRT.defaultBlockState()))));
 ```
 
-Since Minecraft 26.2, `SurfaceRules.isBiome(...)` needs the biome registry, which does not exist yet in
-`onInitialize()`. So you give a function `biomes -> ...` that the API calls when a world loads, and pass
-`biomes` to `isBiome(biomes, ...)`. Rules without `isBiome` can still be given directly: `addOverworld(id, rule)`.
+Since Minecraft 26.3, surface rules are **material rules** (`MaterialRules.ifTrue / sequence / state / waterBlockCheck
+...`, the same ideas as the old `SurfaceRules`). They refer to biomes and to named conditions like "on floor"
+through registries that don't exist yet in `onInitialize()`. So you give a function `ctx -> ...` that the API calls
+when a world loads. `ctx` (`SurfaceRuleContext`) gives you:
 
-Your rules run before the vanilla rules. Always wrap them in `SurfaceRules.isBiome(biomes, ...)` so they only
-change your own biomes. The Nether and the End work the same way:
+| `ctx.` | What it is |
+|---|---|
+| `isBiome(biome, ...)` | True in these biomes (wrap every rule in this) |
+| `onFloor()`, `underFloor()`, `onCeiling()`, `notUnderwater()` | Vanilla's named conditions (old `SurfaceRules.ON_FLOOR`, ...) |
+| `condition(key)`, `rule(key)` | Any named condition / material rule, e.g. `VanillaMaterialConditions.DEEP_UNDER_FLOOR` |
+| `biomes()`, `conditions()`, `rules()` | The registries themselves |
+
+Rules that need no registry can still be given directly: `addOverworld(id, rule)`.
+
+Your rules run before the dimension's own rule. Always wrap them in `ctx.isBiome(...)` so they only change your own
+biomes. The Nether and the End work the same way:
 
 ```java
-BiomeSurfaceRules.addNether(Identifier.fromNamespaceAndPath("mymod", "ember_floor"), biomes ->
-        SurfaceRules.ifTrue(SurfaceRules.isBiome(biomes, ModBiomes.EMBER_FOREST),
-                SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
-                        SurfaceRules.state(Blocks.MAGMA_BLOCK.defaultBlockState()))));
+BiomeSurfaceRules.addNether(Identifier.fromNamespaceAndPath("mymod", "ember_floor"), ctx ->
+        MaterialRules.ifTrue(ctx.isBiome(ModBiomes.EMBER_FOREST),
+                MaterialRules.ifTrue(ctx.onFloor(),
+                        MaterialRules.state(Blocks.MAGMA_BLOCK.defaultBlockState()))));
 
 // The End: vanilla makes everything end stone; your rule runs first, so only the top of your biome changes
-BiomeSurfaceRules.addEnd(Identifier.fromNamespaceAndPath("mymod", "ash_floor"), biomes ->
-        SurfaceRules.ifTrue(SurfaceRules.isBiome(biomes, ModBiomes.ASH_BARRENS),
-                SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
-                        SurfaceRules.state(Blocks.SMOOTH_BASALT.defaultBlockState()))));
+BiomeSurfaceRules.addEnd(Identifier.fromNamespaceAndPath("mymod", "ash_floor"), ctx ->
+        MaterialRules.ifTrue(ctx.isBiome(ModBiomes.ASH_BARRENS),
+                MaterialRules.ifTrue(ctx.onFloor(),
+                        MaterialRules.state(Blocks.SMOOTH_BASALT.defaultBlockState()))));
 ```
 
 | Method | Dimension |
 |---|---|
-| `BiomeSurfaceRules.addOverworld(id, biomes -> rule)` | Overworld |
-| `BiomeSurfaceRules.addNether(id, biomes -> rule)` | Nether |
-| `BiomeSurfaceRules.addEnd(id, biomes -> rule)` | The End |
+| `BiomeSurfaceRules.addOverworld(id, ctx -> rule)` | Overworld |
+| `BiomeSurfaceRules.addNether(id, ctx -> rule)` | Nether |
+| `BiomeSurfaceRules.addEnd(id, ctx -> rule)` | The End |
 
 ## 4b. The Nether
 
@@ -739,7 +749,7 @@ BiomeReplacements.setPatchSize(5);      // 3 to 10 (default 6 = about 256 blocks
 
 ## Supported versions
 
-Minecraft **26.2** · Fabric · Requires **Fabric API** · Java 25
+Minecraft **26.3** · Fabric · Requires **Fabric API** · Java 25
 
 ## License
 

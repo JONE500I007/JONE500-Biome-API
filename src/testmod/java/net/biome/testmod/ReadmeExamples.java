@@ -166,10 +166,10 @@ final class ReadmeExamples {
 	}
 
 	static void surfaceRules() {
-		net.biome.api.surface.BiomeSurfaceRules.addEnd(Identifier.fromNamespaceAndPath("mymod", "ash_floor"), biomes ->
-				net.minecraft.world.level.levelgen.SurfaceRules.ifTrue(net.minecraft.world.level.levelgen.SurfaceRules.isBiome(biomes, DUNES),
-						net.minecraft.world.level.levelgen.SurfaceRules.ifTrue(net.minecraft.world.level.levelgen.SurfaceRules.ON_FLOOR,
-								net.minecraft.world.level.levelgen.SurfaceRules.state(net.minecraft.world.level.block.Blocks.SMOOTH_BASALT.defaultBlockState()))));
+		net.biome.api.surface.BiomeSurfaceRules.addEnd(Identifier.fromNamespaceAndPath("mymod", "ash_floor"), ctx ->
+				net.minecraft.world.level.levelgen.material.MaterialRules.ifTrue(ctx.isBiome(DUNES),
+						net.minecraft.world.level.levelgen.material.MaterialRules.ifTrue(ctx.onFloor(),
+								net.minecraft.world.level.levelgen.material.MaterialRules.state(net.minecraft.world.level.block.Blocks.SMOOTH_BASALT.defaultBlockState()))));
 	}
 
 	static void weighted() {

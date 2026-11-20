@@ -16,6 +16,7 @@ import net.biome.api.region.BiomeRegions;
 import net.biome.api.region.BiomeReplacements;
 import net.biome.api.region.RegionDimension;
 import net.biome.api.surface.BiomeSurfaceRules;
+import net.biome.api.surface.SurfaceRuleContext;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
@@ -30,7 +31,8 @@ import net.minecraft.world.level.biome.TheEndBiomeSource;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.dimension.LevelStem;
 import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
-import net.minecraft.world.level.levelgen.SurfaceRules;
+import net.minecraft.world.level.levelgen.material.MaterialRules;
+import net.minecraft.world.level.levelgen.material.rule.MaterialRule;
 
 /**
  * Applies regions, replacements and surface rules to the Overworld, the Nether and the End when a server
@@ -50,9 +52,11 @@ public final class BiomeApiWorldSetup {
 		Registry<LevelStem> stems = registries.lookupOrThrow(Registries.LEVEL_STEM);
 		long seed = server.getWorldGenSettings().options().seed();
 
-		setUpMultiNoise(registries, stems, RegionDimension.OVERWORLD, seed, BiomeSurfaceRules.getOverworld(registries.lookupOrThrow(Registries.BIOME)));
-		setUpMultiNoise(registries, stems, RegionDimension.NETHER, seed, BiomeSurfaceRules.getNether(registries.lookupOrThrow(Registries.BIOME)));
-		setUpEnd(registries, stems, seed);
+		SurfaceRuleContext surfaceContext = new SurfaceRuleContext(registries.lookupOrThrow(Registries.BIOME),
+				registries.lookupOrThrow(Registries.MATERIAL_CONDITION), registries.lookupOrThrow(Registries.MATERIAL_RULE));
+		setUpMultiNoise(registries, stems, RegionDimension.OVERWORLD, seed, BiomeSurfaceRules.getOverworld(surfaceContext));
+		setUpMultiNoise(registries, stems, RegionDimension.NETHER, seed, BiomeSurfaceRules.getNether(surfaceContext));
+		setUpEnd(registries, stems, seed, BiomeSurfaceRules.getEnd(surfaceContext));
 	}
 
 	/** The seed a dimension's region map uses (each dimension differs, so the Nether doesn't mirror the Overworld). */
@@ -61,7 +65,7 @@ public final class BiomeApiWorldSetup {
 	}
 
 	private static void setUpMultiNoise(RegistryAccess registries, Registry<LevelStem> stems, RegionDimension dimension, long seed,
-			List<SurfaceRules.RuleSource> rules) {
+			List<MaterialRule> rules) {
 		LevelStem stem = stems.getValue(dimension.levelStem());
 		if (stem == null) {
 			return;
@@ -106,11 +110,11 @@ public final class BiomeApiWorldSetup {
 	}
 
 	/** Our rules first, then the dimension's own rule (vanilla or datapack). */
-	private static void applySurfaceRules(NoiseBasedChunkGenerator noiseGenerator, List<SurfaceRules.RuleSource> rules) {
+	private static void applySurfaceRules(NoiseBasedChunkGenerator noiseGenerator, List<MaterialRule> rules) {
 		if (!rules.isEmpty()) {
-			List<SurfaceRules.RuleSource> all = new ArrayList<>(rules);
-			all.add(noiseGenerator.generatorSettings().value().surfaceRule());
-			((BiomeApiChunkGenerator) (Object) noiseGenerator).jone500$setSurfaceRule(SurfaceRules.sequence(all.toArray(SurfaceRules.RuleSource[]::new)));
+			List<MaterialRule> all = new ArrayList<>(rules);
+			all.add(noiseGenerator.generatorSettings().value().materialRule().value());
+			((BiomeApiChunkGenerator) (Object) noiseGenerator).jone500$setSurfaceRule(MaterialRules.sequence(all));
 		}
 	}
 
@@ -118,11 +122,11 @@ public final class BiomeApiWorldSetup {
 	 * The End has no climate: End regions and world-wide replacements relabel the biome vanilla (or Fabric API's
 	 * TheEndBiomes) picked.
 	 */
-	private static void setUpEnd(RegistryAccess registries, Registry<LevelStem> stems, long seed) {
+	private static void setUpEnd(RegistryAccess registries, Registry<LevelStem> stems, long seed, List<MaterialRule> surfaceRules) {
 		LevelStem stem = stems.getValue(LevelStem.END);
 		if (stem != null && stem.generator() instanceof NoiseBasedChunkGenerator noiseGenerator) {
 			// Surface rules work with any End biome source (also other mods' End generators that use noise).
-			applySurfaceRules(noiseGenerator, BiomeSurfaceRules.getEnd(registries.lookupOrThrow(Registries.BIOME)));
+			applySurfaceRules(noiseGenerator, surfaceRules);
 		}
 		if (stem == null || !(stem.generator().getBiomeSource() instanceof TheEndBiomeSource endSource)) {
 			if (!BiomeRegions.getAll(RegionDimension.END).isEmpty()) {

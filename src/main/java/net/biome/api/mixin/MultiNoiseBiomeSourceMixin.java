@@ -22,6 +22,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeResolver;
 import net.minecraft.world.level.biome.Climate;
 import net.minecraft.world.level.biome.MultiNoiseBiomeSource;
 
@@ -49,22 +50,38 @@ public abstract class MultiNoiseBiomeSourceMixin implements BiomeApiBiomeSource 
 	}
 
 	/**
-	 * Every biome lookup of this source (chunk generation, /locate, F3) goes through here.
+	 * Since Minecraft 26.3 every biome lookup of this source (chunk generation, /locate, F3) goes through a
+	 * {@link BiomeResolver} made here (one per call or per chunk).
 	 *
 	 * <p>Wraps the whole method, including other mods' changes (TerraBlender, Biolith, ...): spots that belong to
-	 * one of our regions get our biome; every other spot is left to the original method (vanilla or the other
+	 * one of our regions get our biome; every other spot is left to the original resolver (vanilla or the other
 	 * mods), and only our world-wide replacements are applied to its result.
 	 */
-	@WrapMethod(method = "getNoiseBiome(IIILnet/minecraft/world/level/biome/Climate$Sampler;)Lnet/minecraft/core/Holder;")
-	private Holder<Biome> jone500$regionBiome(int quartX, int quartY, int quartZ, Climate.Sampler sampler, Operation<Holder<Biome>> original) {
+	@WrapMethod(method = "createResolver")
+	private BiomeResolver jone500$wrapResolver(Climate.Sampler sampler, Operation<BiomeResolver> original) {
+		return jone500$wrap(original.call(sampler), sampler);
+	}
+
+	/** Same for the per-chunk resolver (it samples the whole chunk's climate at once for vanilla spots). */
+	@WrapMethod(method = "createResolverForChunk")
+	private BiomeResolver jone500$wrapChunkResolver(Climate.Sampler sampler, int quartX, int quartY, int quartZ, int sizeX, int sizeY, int sizeZ,
+			Operation<BiomeResolver> original) {
+		return jone500$wrap(original.call(sampler, quartX, quartY, quartZ, sizeX, sizeY, sizeZ), sampler);
+	}
+
+	@Unique
+	private BiomeResolver jone500$wrap(BiomeResolver original, Climate.Sampler sampler) {
 		RegionBiomeLookup lookup = jone500$lookup;
 		if (lookup == null) {
-			return original.call(quartX, quartY, quartZ, sampler);
+			return original;
 		}
-		if (!lookup.isVanillaCell(quartX, quartZ)) {
-			return lookup.getBiome(sampler.sample(quartX, quartY, quartZ), quartX, quartZ, parameters());
-		}
-		return lookup.applyGlobalReplacements(original.call(quartX, quartY, quartZ, sampler), quartX, quartZ);
+		Climate.ParameterList<Holder<Biome>> parameters = parameters();
+		return (quartX, quartY, quartZ) -> {
+			if (!lookup.isVanillaCell(quartX, quartZ)) {
+				return lookup.getBiome(sampler.sample(quartX, quartY, quartZ), quartX, quartZ, parameters);
+			}
+			return lookup.applyGlobalReplacements(original.getNoiseBiome(quartX, quartY, quartZ), quartX, quartZ);
+		};
 	}
 
 	/** Region biomes are possible biomes too (features and structures need this). */

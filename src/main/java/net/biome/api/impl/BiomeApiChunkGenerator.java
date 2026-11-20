@@ -1,8 +1,8 @@
 package net.biome.api.impl;
 
-import net.minecraft.world.level.levelgen.SurfaceRules;
+import net.minecraft.world.level.levelgen.material.rule.MaterialRule;
 
 /** Added to NoiseBasedChunkGenerator by a mixin. Internal, not part of the API. */
 public interface BiomeApiChunkGenerator {
-	void jone500$setSurfaceRule(SurfaceRules.RuleSource rule);
+	void jone500$setSurfaceRule(MaterialRule rule);
 }

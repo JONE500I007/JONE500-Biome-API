@@ -99,7 +99,7 @@ public class BiomeClientGameTest implements FabricClientGameTest {
 			throw new AssertionError(biome.identifier() + " is not in the possible biomes");
 		}
 		Pair<BlockPos, Holder<Biome>> found = source.findClosestBiome3d(BlockPos.ZERO.atY(80), 6400, 32, 64,
-				b -> b.is(biome), overworld.getChunkSource().randomState().sampler(), overworld);
+				b -> b.is(biome), overworld.getChunkSource().randomState(), overworld);
 		if (found == null) {
 			throw new AssertionError("could not find " + biome.identifier() + " within 6400 blocks");
 		}

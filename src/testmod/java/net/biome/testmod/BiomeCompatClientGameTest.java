@@ -277,14 +277,14 @@ public class BiomeCompatClientGameTest implements FabricClientGameTest {
 	}
 
 	private static Holder<Biome> biomeAt(ServerLevel level, int x, int y, int z) {
-		Climate.Sampler sampler = level.getChunkSource().randomState().sampler();
-		return level.getChunkSource().getGenerator().getBiomeSource().getNoiseBiome(x >> 2, y >> 2, z >> 2, sampler);
+		Climate.Sampler sampler = TestWorldgen.sampler(level.getChunkSource().randomState());
+		return TestWorldgen.biome(level.getChunkSource().getGenerator().getBiomeSource(), x >> 2, y >> 2, z >> 2, sampler);
 	}
 
 	private static BlockPos find(ServerLevel level, ResourceKey<Biome> biome, int y) {
 		Predicate<Holder<Biome>> test = b -> b.is(biome);
 		Pair<BlockPos, Holder<Biome>> found = level.getChunkSource().getGenerator().getBiomeSource().findClosestBiome3d(
-				new BlockPos(0, y, 0), 6400, 32, 64, test, level.getChunkSource().randomState().sampler(), level);
+				new BlockPos(0, y, 0), 6400, 32, 64, test, level.getChunkSource().randomState(), level);
 		return found == null ? null : found.getFirst();
 	}
 

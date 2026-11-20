@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 
+import net.minecraft.util.ARGB;
+import net.minecraft.util.valueproviders.UniformInt;
 import net.minecraft.core.Holder;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.data.worldgen.Carvers;
@@ -30,7 +32,7 @@ import net.minecraft.world.level.biome.BiomeGenerationSettings;
 import net.minecraft.world.level.biome.BiomeSpecialEffects;
 import net.minecraft.world.level.biome.MobSpawnSettings;
 import net.minecraft.world.level.levelgen.GenerationStep;
-import net.minecraft.world.level.levelgen.carver.ConfiguredWorldCarver;
+import net.minecraft.world.level.levelgen.carver.WorldCarver;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 
 /**
@@ -64,13 +66,14 @@ public final class BiomeMaker {
 	private Integer skyColor;
 	private Integer fogColor;
 	private Integer waterFogColor;
+	private Float animalSpawnChance;
 	private Holder<SoundEvent> music;
 	private AmbientSounds ambientSounds;
 	private final List<AmbientParticle> particles = new ArrayList<>();
 	/** Overworld biomes get vanilla's sky color for their temperature; Nether/End skies come from the dimension. */
 	private boolean skyFromTemperature = true;
 
-	private BiomeMaker(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<ConfiguredWorldCarver<?>> carvers) {
+	private BiomeMaker(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers) {
 		this.generation = new BiomeGenerationSettings.Builder(placedFeatures, carvers);
 	}
 
@@ -131,11 +134,11 @@ public final class BiomeMaker {
 	 * Add the surface plants, trees and mobs yourself.
 	 */
 	public static BiomeMaker overworld(BootstrapContext<Biome> context) {
-		return overworld(context.lookup(Registries.PLACED_FEATURE), context.lookup(Registries.CONFIGURED_CARVER));
+		return overworld(context.lookup(Registries.PLACED_FEATURE), context.lookup(Registries.CARVER));
 	}
 
 	/** Same as {@link #overworld(BootstrapContext)}, with the lookups given directly. */
-	public static BiomeMaker overworld(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<ConfiguredWorldCarver<?>> carvers) {
+	public static BiomeMaker overworld(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers) {
 		return new BiomeMaker(placedFeatures, carvers)
 				.vanillaCaves()
 				.vanillaGeodes()
@@ -157,11 +160,11 @@ public final class BiomeMaker {
 	 * }</pre>
 	 */
 	public static BiomeMaker empty(BootstrapContext<Biome> context) {
-		return new BiomeMaker(context.lookup(Registries.PLACED_FEATURE), context.lookup(Registries.CONFIGURED_CARVER));
+		return new BiomeMaker(context.lookup(Registries.PLACED_FEATURE), context.lookup(Registries.CARVER));
 	}
 
 	/** Same as {@link #empty(BootstrapContext)}, with the lookups given directly. */
-	public static BiomeMaker empty(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<ConfiguredWorldCarver<?>> carvers) {
+	public static BiomeMaker empty(HolderGetter<PlacedFeature> placedFeatures, HolderGetter<WorldCarver> carvers) {
 		return new BiomeMaker(placedFeatures, carvers);
 	}
 
@@ -373,7 +376,7 @@ public final class BiomeMaker {
 	}
 
 	/** Adds a carver (caves, canyons). */
-	public BiomeMaker addCarver(ResourceKey<ConfiguredWorldCarver<?>> carver) {
+	public BiomeMaker addCarver(ResourceKey<WorldCarver> carver) {
 		generation.addCarver(carver);
 		return this;
 	}
@@ -398,13 +401,13 @@ public final class BiomeMaker {
 	 * @param weight how often compared to other mobs of the same category (vanilla cow = 8, zombie = 95)
 	 */
 	public BiomeMaker spawn(EntityType<?> type, int weight, int minGroup, int maxGroup) {
-		spawns.addSpawn(type.getCategory(), weight, new MobSpawnSettings.SpawnerData(type, minGroup, maxGroup));
+		spawns.addSpawn(type, type.getCategory(), weight, UniformInt.of(minGroup, maxGroup));
 		return this;
 	}
 
 	/** Adds a mob spawn with an explicit category. */
 	public BiomeMaker spawn(MobCategory category, EntityType<?> type, int weight, int minGroup, int maxGroup) {
-		spawns.addSpawn(category, weight, new MobSpawnSettings.SpawnerData(type, minGroup, maxGroup));
+		spawns.addSpawn(type, category, weight, UniformInt.of(minGroup, maxGroup));
 		return this;
 	}
 
@@ -425,7 +428,7 @@ public final class BiomeMaker {
 
 	/** How often animals spawn when chunks generate (vanilla default 0.1, snowy biomes 0.07). */
 	public BiomeMaker animalSpawnChance(float chance) {
-		spawns.creatureGenerationProbability(chance);
+		this.animalSpawnChance = chance;
 		return this;
 	}
 
@@ -461,9 +464,9 @@ public final class BiomeMaker {
 				.mobSpawnSettings(spawns.build())
 				.generationSettings(generation.build());
 		if (skyColor != null) {
-			builder.setAttribute(EnvironmentAttributes.SKY_COLOR, skyColor);
+			builder.setAttribute(EnvironmentAttributes.SKY_COLOR, ARGB.vector3fFromRGB24(skyColor));
 		} else if (skyFromTemperature) {
-			builder.setAttribute(EnvironmentAttributes.SKY_COLOR, OverworldBiomes.calculateSkyColor(temperature));
+			builder.setAttribute(EnvironmentAttributes.SKY_COLOR, ARGB.vector3fFromRGB24(OverworldBiomes.calculateSkyColor(temperature)));
 		}
 		if (!particles.isEmpty()) {
 			builder.setAttribute(EnvironmentAttributes.AMBIENT_PARTICLES, List.copyOf(particles));
@@ -472,13 +475,16 @@ public final class BiomeMaker {
 			builder.setAttribute(EnvironmentAttributes.AMBIENT_SOUNDS, ambientSounds);
 		}
 		if (fogColor != null) {
-			builder.setAttribute(EnvironmentAttributes.FOG_COLOR, fogColor);
+			builder.setAttribute(EnvironmentAttributes.FOG_COLOR, ARGB.vector3fFromRGB24(fogColor));
 		}
 		if (waterFogColor != null) {
-			builder.setAttribute(EnvironmentAttributes.WATER_FOG_COLOR, waterFogColor);
+			builder.setAttribute(EnvironmentAttributes.WATER_FOG_COLOR, ARGB.vector3fFromRGB24(waterFogColor));
 		}
 		if (music != null) {
 			builder.setAttribute(EnvironmentAttributes.BACKGROUND_MUSIC, new BackgroundMusic(music));
+		}
+		if (animalSpawnChance != null) {
+			builder.setAttribute(EnvironmentAttributes.CREATURE_WORLD_GEN_SPAWN_PROBABILITY, animalSpawnChance);
 		}
 		return builder.build();
 	}

@@ -28,7 +28,7 @@ import net.minecraft.world.level.biome.Climate;
 import net.minecraft.world.level.biome.MultiNoiseBiomeSourceParameterLists;
 import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import net.minecraft.world.level.levelgen.RandomState;
-import net.minecraft.world.level.levelgen.SurfaceRules;
+import net.minecraft.world.level.levelgen.material.MaterialRules;
 
 /**
  * Tries to break the API: wrong use, missing biome files, extreme coordinates, many threads, speed.
@@ -83,7 +83,7 @@ public class BiomeRobustnessGameTest {
 		expectError(problems, "replacement registered too late", () -> BiomeReplacements.replace(Biomes.PLAINS, mine, 0.5F));
 		expectError(problems, "whole replacement registered too late", () -> BiomeReplacements.replaceWholeBiome(Biomes.PLAINS, mine, 0.5F));
 		expectError(problems, "duplicate surface rule id",
-				() -> BiomeSurfaceRules.addOverworld(BiomeTestMod.id("red_plains_sand"), SurfaceRules.state(net.minecraft.world.level.block.Blocks.STONE.defaultBlockState())));
+				() -> BiomeSurfaceRules.addOverworld(BiomeTestMod.id("red_plains_sand"), MaterialRules.state(net.minecraft.world.level.block.Blocks.STONE.defaultBlockState())));
 
 		if (!problems.isEmpty()) {
 			ctx.fail(Component.literal("wrong use was accepted: " + problems));
@@ -235,11 +235,11 @@ public class BiomeRobustnessGameTest {
 			RegistryAccess registries = ctx.getLevel().registryAccess();
 			Climate.ParameterList<Holder<Biome>> vanilla = registries.lookupOrThrow(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST)
 					.getOrThrow(MultiNoiseBiomeSourceParameterLists.OVERWORLD).value().parameters();
-			RandomState randomState = RandomState.create(registries, NoiseGeneratorSettings.OVERWORLD, SEED);
+			RandomState randomState = TestWorldgen.randomState(registries, NoiseGeneratorSettings.OVERWORLD, SEED);
 			RegionBiomeLookup lookup = RegionBiomeLookup.create(SEED, BiomeRegions.getRegionSize(), vanillaWeight, regions,
 					BiomeReplacements.getAll(), BiomeReplacements.getPatchSize(), BiomeReplacements.getAllWholeBiome(), SEED,
 					vanilla, registries.lookupOrThrow(Registries.BIOME));
-			return new Env(randomState.sampler(), vanilla, lookup);
+			return new Env(TestWorldgen.sampler(randomState), vanilla, lookup);
 		}
 
 		Holder<Biome> biomeAt(int qx, int qy, int qz) {
