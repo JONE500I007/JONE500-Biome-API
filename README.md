@@ -1,6 +1,6 @@
 # JONE500 Biome API
 
-A Fabric library for **Minecraft 26.1** that adds your Overworld, Nether and End biomes in **regions**:
+A Fabric library for **Minecraft 26.2** that adds your Overworld, Nether and End biomes in **regions**:
 
 - **Deterministic:** regions are sorted by id, so the same seed always gives the same world, no matter
   in which order mods load.
@@ -32,7 +32,7 @@ repositories {
 }
 
 dependencies {
-    implementation "maven.modrinth:jone500-biome-api:1.0.0+26.1"
+    implementation "maven.modrinth:jone500-biome-api:1.0.0+26.2"
 }
 ```
 
@@ -73,7 +73,7 @@ public static void bootstrap(BootstrapContext<Biome> context) {
             .music(SoundEvents.MUSIC_BIOME_MEADOW)
             .farmAnimals()                       // sheep, pigs, chickens, cows
             .defaultMonsters()                   // zombies, skeletons, creepers... + bats in caves
-            .spawn(EntityType.FOX, 8, 2, 4)      // any mob: type, weight, min group, max group
+            .spawn(EntityTypes.FOX, 8, 2, 4)      // any mob: type, weight, min group, max group
             .features(BiomeDefaultFeatures::addPlainGrass)        // any vanilla helper
             .features(BiomeDefaultFeatures::addMeadowVegetation)
             .addFeature(GenerationStep.Decoration.VEGETAL_DECORATION, ModPlacedFeatures.APPLE_TREE)  // your own
@@ -407,33 +407,37 @@ to snowy plains looks wrong. A biome can only get more common by taking area fro
 ## 4. Surface rules (optional)
 
 ```java
-BiomeSurfaceRules.addOverworld(Identifier.fromNamespaceAndPath("mymod", "surface"),
-        SurfaceRules.ifTrue(SurfaceRules.isBiome(ModBiomes.APPLE_GROVE),
+BiomeSurfaceRules.addOverworld(Identifier.fromNamespaceAndPath("mymod", "surface"), biomes ->
+        SurfaceRules.ifTrue(SurfaceRules.isBiome(biomes, ModBiomes.APPLE_GROVE),
                 SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
                         SurfaceRules.state(Blocks.COARSE_DIRT.defaultBlockState()))));
 ```
 
-Your rules run before the vanilla rules. Always wrap them in `SurfaceRules.isBiome(...)` so they only
+Since Minecraft 26.2, `SurfaceRules.isBiome(...)` needs the biome registry, which does not exist yet in
+`onInitialize()`. So you give a function `biomes -> ...` that the API calls when a world loads, and pass
+`biomes` to `isBiome(biomes, ...)`. Rules without `isBiome` can still be given directly: `addOverworld(id, rule)`.
+
+Your rules run before the vanilla rules. Always wrap them in `SurfaceRules.isBiome(biomes, ...)` so they only
 change your own biomes. The Nether and the End work the same way:
 
 ```java
-BiomeSurfaceRules.addNether(Identifier.fromNamespaceAndPath("mymod", "ember_floor"),
-        SurfaceRules.ifTrue(SurfaceRules.isBiome(ModBiomes.EMBER_FOREST),
+BiomeSurfaceRules.addNether(Identifier.fromNamespaceAndPath("mymod", "ember_floor"), biomes ->
+        SurfaceRules.ifTrue(SurfaceRules.isBiome(biomes, ModBiomes.EMBER_FOREST),
                 SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
                         SurfaceRules.state(Blocks.MAGMA_BLOCK.defaultBlockState()))));
 
 // The End: vanilla makes everything end stone; your rule runs first, so only the top of your biome changes
-BiomeSurfaceRules.addEnd(Identifier.fromNamespaceAndPath("mymod", "ash_floor"),
-        SurfaceRules.ifTrue(SurfaceRules.isBiome(ModBiomes.ASH_BARRENS),
+BiomeSurfaceRules.addEnd(Identifier.fromNamespaceAndPath("mymod", "ash_floor"), biomes ->
+        SurfaceRules.ifTrue(SurfaceRules.isBiome(biomes, ModBiomes.ASH_BARRENS),
                 SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
                         SurfaceRules.state(Blocks.SMOOTH_BASALT.defaultBlockState()))));
 ```
 
 | Method | Dimension |
 |---|---|
-| `BiomeSurfaceRules.addOverworld(id, rule)` | Overworld |
-| `BiomeSurfaceRules.addNether(id, rule)` | Nether |
-| `BiomeSurfaceRules.addEnd(id, rule)` | The End |
+| `BiomeSurfaceRules.addOverworld(id, biomes -> rule)` | Overworld |
+| `BiomeSurfaceRules.addNether(id, biomes -> rule)` | Nether |
+| `BiomeSurfaceRules.addEnd(id, biomes -> rule)` | The End |
 
 ## 4b. The Nether
 
@@ -594,9 +598,9 @@ context.register(ModBiomes.SLIME_MARSH, BiomeMaker.overworld(context)
         .downfall(0.9F)
         .spawns(BiomeDefaultFeatures::farmAnimals)                             // vanilla helper (= .farmAnimals())
         .spawns(BiomeDefaultFeatures::commonSpawns)                            // vanilla helper (= .defaultMonsters())
-        .spawn(EntityType.SLIME, 100, 1, 4)                                    // monster (default category)
-        .spawn(MobCategory.CREATURE, EntityType.FROG, 10, 2, 5)                // pick the category yourself
-        .spawn(MobCategory.WATER_AMBIENT, EntityType.TROPICAL_FISH, 25, 8, 8)
+        .spawn(EntityTypes.SLIME, 100, 1, 4)                                    // monster (default category)
+        .spawn(MobCategory.CREATURE, EntityTypes.FROG, 10, 2, 5)                // pick the category yourself
+        .spawn(MobCategory.WATER_AMBIENT, EntityTypes.TROPICAL_FISH, 25, 8, 8)
         .animalSpawnChance(0.07F)                                              // more animals when chunks generate
         .features(BiomeDefaultFeatures::addSwampVegetation)
         .build());
@@ -634,7 +638,7 @@ context.register(ModBiomes.EMBER_FOREST, BiomeMaker.nether(context)     // nethe
         .particles(ParticleTypes.CRIMSON_SPORE, 0.025F)
         .music(SoundEvents.MUSIC_BIOME_CRIMSON_FOREST)
         .addFeature(GenerationStep.Decoration.VEGETAL_DECORATION, NetherPlacements.CRIMSON_FOREST_VEGETATION)
-        .spawn(EntityType.STRIDER, 60, 1, 2)
+        .spawn(EntityTypes.STRIDER, 60, 1, 2)
         .build());
 ```
 
@@ -735,7 +739,7 @@ BiomeReplacements.setPatchSize(5);      // 3 to 10 (default 6 = about 256 blocks
 
 ## Supported versions
 
-Minecraft **26.1** (26.1, 26.1.1, 26.1.2) · Fabric · Requires **Fabric API** · Java 25
+Minecraft **26.2** · Fabric · Requires **Fabric API** · Java 25
 
 ## License
 

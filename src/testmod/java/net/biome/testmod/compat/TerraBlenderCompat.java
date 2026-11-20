@@ -31,10 +31,10 @@ public class TerraBlenderCompat implements TerraBlenderApi {
 				addModifiedVanillaOverworldBiomes(mapper, builder -> builder.replaceBiome(Biomes.PLAINS, BiomeTestMod.TB_MEADOW));
 			}
 		});
-		SurfaceRuleManager.addSurfaceRules(SurfaceRuleManager.RuleCategory.OVERWORLD, BiomeTestMod.MOD_ID,
-				SurfaceRules.ifTrue(SurfaceRules.isBiome(BiomeTestMod.TB_MEADOW),
+		SurfaceRuleManager.addSurfaceRules(SurfaceRuleManager.RuleCategory.OVERWORLD, BiomeTestMod.MOD_ID, biomes ->
+				SurfaceRules.ifTrue(SurfaceRules.isBiome(biomes, BiomeTestMod.TB_MEADOW),
 						SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
 								SurfaceRules.ifTrue(SurfaceRules.waterBlockCheck(-1, 0),
-										SurfaceRules.state(Blocks.BLUE_TERRACOTTA.defaultBlockState())))));
+										SurfaceRules.state(Blocks.DYED_TERRACOTTA.blue().defaultBlockState())))));
 	}
 }

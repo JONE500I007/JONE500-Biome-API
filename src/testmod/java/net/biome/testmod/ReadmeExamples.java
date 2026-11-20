@@ -24,6 +24,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
@@ -86,9 +87,9 @@ final class ReadmeExamples {
 				.downfall(0.9F)
 				.spawns(BiomeDefaultFeatures::farmAnimals)
 				.spawns(BiomeDefaultFeatures::commonSpawns)
-				.spawn(EntityType.SLIME, 100, 1, 4)
-				.spawn(MobCategory.CREATURE, EntityType.FROG, 10, 2, 5)
-				.spawn(MobCategory.WATER_AMBIENT, EntityType.TROPICAL_FISH, 25, 8, 8)
+				.spawn(EntityTypes.SLIME, 100, 1, 4)
+				.spawn(MobCategory.CREATURE, EntityTypes.FROG, 10, 2, 5)
+				.spawn(MobCategory.WATER_AMBIENT, EntityTypes.TROPICAL_FISH, 25, 8, 8)
 				.animalSpawnChance(0.07F)
 				.features(BiomeDefaultFeatures::addSwampVegetation)
 				.build());
@@ -113,7 +114,7 @@ final class ReadmeExamples {
 				.particles(ParticleTypes.CRIMSON_SPORE, 0.025F)
 				.music(SoundEvents.MUSIC_BIOME_CRIMSON_FOREST)
 				.addFeature(GenerationStep.Decoration.VEGETAL_DECORATION, NetherPlacements.CRIMSON_FOREST_VEGETATION)
-				.spawn(EntityType.STRIDER, 60, 1, 2)
+				.spawn(EntityTypes.STRIDER, 60, 1, 2)
 				.build());
 	}
 
@@ -165,8 +166,8 @@ final class ReadmeExamples {
 	}
 
 	static void surfaceRules() {
-		net.biome.api.surface.BiomeSurfaceRules.addEnd(Identifier.fromNamespaceAndPath("mymod", "ash_floor"),
-				net.minecraft.world.level.levelgen.SurfaceRules.ifTrue(net.minecraft.world.level.levelgen.SurfaceRules.isBiome(DUNES),
+		net.biome.api.surface.BiomeSurfaceRules.addEnd(Identifier.fromNamespaceAndPath("mymod", "ash_floor"), biomes ->
+				net.minecraft.world.level.levelgen.SurfaceRules.ifTrue(net.minecraft.world.level.levelgen.SurfaceRules.isBiome(biomes, DUNES),
 						net.minecraft.world.level.levelgen.SurfaceRules.ifTrue(net.minecraft.world.level.levelgen.SurfaceRules.ON_FLOOR,
 								net.minecraft.world.level.levelgen.SurfaceRules.state(net.minecraft.world.level.block.Blocks.SMOOTH_BASALT.defaultBlockState()))));
 	}

@@ -104,8 +104,8 @@ public class BiomeTestMod implements ModInitializer {
 						.add(BONE_FIELDS, 1)
 						.build())
 				.register();
-		BiomeSurfaceRules.addNether(id("ember_floor"),
-				SurfaceRules.ifTrue(SurfaceRules.isBiome(EMBER_FOREST),
+		BiomeSurfaceRules.addNether(id("ember_floor"), biomes ->
+				SurfaceRules.ifTrue(SurfaceRules.isBiome(biomes, EMBER_FOREST),
 						SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR, SurfaceRules.state(Blocks.MAGMA_BLOCK.defaultBlockState()))));
 
 		// ---- End: placed with Fabric API, plus a whole-biome swap from this API ----
@@ -118,8 +118,8 @@ public class BiomeTestMod implements ModInitializer {
 				.replace(Biomes.END_MIDLANDS, ASH_BARRENS, 0.5F)
 				.register();
 		// End surface rule: the ground of ash barrens is smooth basalt instead of end stone.
-		BiomeSurfaceRules.addEnd(id("ash_floor"),
-				SurfaceRules.ifTrue(SurfaceRules.isBiome(ASH_BARRENS),
+		BiomeSurfaceRules.addEnd(id("ash_floor"), biomes ->
+				SurfaceRules.ifTrue(SurfaceRules.isBiome(biomes, ASH_BARRENS),
 						SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR, SurfaceRules.state(Blocks.SMOOTH_BASALT.defaultBlockState()))));
 		BiomeReplacements.replaceWholeBiome(Biomes.SMALL_END_ISLANDS, VOID_MEADOW, 1.0F);
 
@@ -127,8 +127,8 @@ public class BiomeTestMod implements ModInitializer {
 			net.biome.testmod.compat.BiolithCompat.register();
 		}
 
-		BiomeSurfaceRules.addOverworld(id("red_plains_sand"),
-				SurfaceRules.ifTrue(SurfaceRules.isBiome(RED_PLAINS),
+		BiomeSurfaceRules.addOverworld(id("red_plains_sand"), biomes ->
+				SurfaceRules.ifTrue(SurfaceRules.isBiome(biomes, RED_PLAINS),
 						SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
 								SurfaceRules.ifTrue(SurfaceRules.waterBlockCheck(-1, 0),
 										SurfaceRules.state(Blocks.RED_SAND.defaultBlockState())))));

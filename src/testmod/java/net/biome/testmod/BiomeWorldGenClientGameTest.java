@@ -11,7 +11,7 @@ import net.biome.api.JONE500BiomeAPI;
 import net.biome.api.impl.BiomeApiBiomeSource;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
-import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerConnection;
+import net.fabricmc.fabric.api.client.gametest.v1.context.TestDedicatedServerConnection;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestDedicatedServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.world.TestWorldSave;
@@ -57,14 +57,14 @@ public class BiomeWorldGenClientGameTest implements FabricClientGameTest {
 				.setUseConsistentSettings(false)
 				.adjustSettings(s -> s.setSeed("424242"))
 				.create()) {
-			world.getClientLevel().waitForChunksRender();
+			world.getConnection().waitForChunksRender();
 			remembered = world.getServer().computeOnServer(BiomeWorldGenClientGameTest::generateEverywhere);
 			save = world.getWorldSave();
 		}
 
 		// ---- 2. reopen the same world: same biomes ----
 		try (TestSingleplayerContext world = save.open()) {
-			world.getClientLevel().waitForChunksRender();
+			world.getConnection().waitForChunksRender();
 			world.getServer().runOnServer(server -> {
 				for (Map.Entry<BlockPos, String> entry : remembered.entrySet()) {
 					ServerLevel level = levelFor(server, entry.getKey());
@@ -91,7 +91,7 @@ public class BiomeWorldGenClientGameTest implements FabricClientGameTest {
 						s.setWorldType(findPreset(s, preset));
 					})
 					.create()) {
-				world.getClientLevel().waitForChunksRender();
+				world.getConnection().waitForChunksRender();
 				world.getServer().runOnServer(server -> {
 					ServerLevel overworld = server.overworld();
 					BiomeSource source = overworld.getChunkSource().getGenerator().getBiomeSource();
@@ -121,12 +121,12 @@ public class BiomeWorldGenClientGameTest implements FabricClientGameTest {
 				.adjustSettings(s -> s.setSeed("424242"))
 				.createServer()) {
 			BlockPos red = server.computeOnServer(s -> findSurface(s.overworld(), BiomeTestMod.RED_PLAINS));
-			try (TestServerConnection connection = server.connect()) {
+			try (TestDedicatedServerConnection connection = server.connect()) {
 				server.runCommand("op @a");
 				server.runCommand("gamemode spectator @a");
 				server.runCommand("tp @a " + red.getX() + " " + (red.getY() + 30) + " " + red.getZ() + " 0 60");
 				context.waitTicks(40);
-				connection.getClientLevel().waitForChunksRender();
+				connection.waitForChunksRender();
 				String onServer = server.computeOnServer(s -> s.overworld().getBiome(red).getRegisteredName());
 				String onClient = context.computeOnClient(mc -> mc.level.getBiome(red).getRegisteredName());
 				JONE500BiomeAPI.LOGGER.info("[worldgen-test] dedicated server: biome at {} is {} on the server and {} on the client",

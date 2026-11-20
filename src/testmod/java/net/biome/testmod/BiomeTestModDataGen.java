@@ -20,6 +20,7 @@ import net.minecraft.data.worldgen.placement.EndPlacements;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.level.biome.Biome;
 
 /** Generates the orange hills biome JSON with {@link BiomeMaker}. Run with: gradlew runDatagen */
@@ -86,7 +87,7 @@ public class BiomeTestModDataGen implements DataGeneratorEntrypoint {
 				.music(SoundEvents.MUSIC_BIOME_MEADOW)
 				.farmAnimals()
 				.defaultMonsters()
-				.spawn(EntityType.FOX, 8, 2, 4)
+				.spawn(EntityTypes.FOX, 8, 2, 4)
 				// Vanilla's own helpers keep vanilla's feature order. Adding the same features in a different
 				// order than another biome (e.g. flowers before grass) causes a "Feature order cycle" crash.
 				.features(BiomeDefaultFeatures::addPlainGrass)
@@ -101,9 +102,9 @@ public class BiomeTestModDataGen implements DataGeneratorEntrypoint {
 				.ambientLoop(SoundEvents.AMBIENT_CRIMSON_FOREST_LOOP)
 				.particles(ParticleTypes.LAVA, 0.002F)
 				.particles(ParticleTypes.WHITE_ASH, 0.05F)
-				.spawn(EntityType.STRIDER, 60, 1, 2)
-				.spawn(EntityType.MAGMA_CUBE, 20, 2, 4)
-				.spawn(EntityType.ZOMBIFIED_PIGLIN, 10, 2, 4)
+				.spawn(EntityTypes.STRIDER, 60, 1, 2)
+				.spawn(EntityTypes.MAGMA_CUBE, 20, 2, 4)
+				.spawn(EntityTypes.ZOMBIFIED_PIGLIN, 10, 2, 4)
 				.build());
 
 		// Two simple Nether biomes for the weighted region test.

@@ -50,8 +50,8 @@ public final class BiomeApiWorldSetup {
 		Registry<LevelStem> stems = registries.lookupOrThrow(Registries.LEVEL_STEM);
 		long seed = server.getWorldGenSettings().options().seed();
 
-		setUpMultiNoise(registries, stems, RegionDimension.OVERWORLD, seed, BiomeSurfaceRules.getOverworld());
-		setUpMultiNoise(registries, stems, RegionDimension.NETHER, seed, BiomeSurfaceRules.getNether());
+		setUpMultiNoise(registries, stems, RegionDimension.OVERWORLD, seed, BiomeSurfaceRules.getOverworld(registries.lookupOrThrow(Registries.BIOME)));
+		setUpMultiNoise(registries, stems, RegionDimension.NETHER, seed, BiomeSurfaceRules.getNether(registries.lookupOrThrow(Registries.BIOME)));
 		setUpEnd(registries, stems, seed);
 	}
 
@@ -122,7 +122,7 @@ public final class BiomeApiWorldSetup {
 		LevelStem stem = stems.getValue(LevelStem.END);
 		if (stem != null && stem.generator() instanceof NoiseBasedChunkGenerator noiseGenerator) {
 			// Surface rules work with any End biome source (also other mods' End generators that use noise).
-			applySurfaceRules(noiseGenerator, BiomeSurfaceRules.getEnd());
+			applySurfaceRules(noiseGenerator, BiomeSurfaceRules.getEnd(registries.lookupOrThrow(Registries.BIOME)));
 		}
 		if (stem == null || !(stem.generator().getBiomeSource() instanceof TheEndBiomeSource endSource)) {
 			if (!BiomeRegions.getAll(RegionDimension.END).isEmpty()) {

@@ -12,6 +12,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.tags.BiomeTags;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.animal.cow.Cow;
 import net.minecraft.world.entity.animal.cow.CowVariant;
 import net.minecraft.world.entity.animal.cow.CowVariants;
@@ -42,7 +43,7 @@ public class BiomeClientGameTest implements FabricClientGameTest {
 				.setUseConsistentSettings(false)
 				.adjustSettings(settings -> settings.setSeed("12345"))
 				.create()) {
-			world.getClientLevel().waitForChunksRender();
+			world.getConnection().waitForChunksRender();
 			world.getServer().runCommand("gamerule doDaylightCycle false");
 			world.getServer().runCommand("time set noon");
 			world.getServer().runCommand("gamemode spectator @a");
@@ -75,7 +76,7 @@ public class BiomeClientGameTest implements FabricClientGameTest {
 	private static void checkCowVariant(MinecraftServer server, BlockPos pos, ResourceKey<CowVariant> expected) {
 		ServerLevel level = server.overworld();
 		BlockPos ground = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, pos);
-		Cow cow = EntityType.COW.spawn(level, ground, EntitySpawnReason.NATURAL);
+		Cow cow = EntityTypes.COW.spawn(level, ground, EntitySpawnReason.NATURAL);
 		check(cow != null, "could not spawn a cow at " + ground);
 		check(cow.getVariant().is(expected), "cow at " + ground + " in " + level.getBiome(ground).getRegisteredName()
 				+ " is " + cow.getVariant().getRegisteredName() + ", expected " + expected.identifier());
@@ -108,7 +109,7 @@ public class BiomeClientGameTest implements FabricClientGameTest {
 	private static void lookFromAbove(ClientGameTestContext context, TestSingleplayerContext world, BlockPos pos, String screenshot) {
 		world.getServer().runCommand("tp @a " + pos.getX() + " 160 " + pos.getZ() + " 0 55");
 		context.waitTicks(20);
-		world.getClientLevel().waitForChunksRender();
+		world.getConnection().waitForChunksRender();
 		context.waitTicks(40);
 		context.takeScreenshot(screenshot);
 	}

@@ -47,7 +47,7 @@ import net.minecraft.world.level.levelgen.placement.PlacedFeature;
  *             .music(SoundEvents.MUSIC_BIOME_MEADOW)
  *             .farmAnimals()
  *             .defaultMonsters()
- *             .spawn(EntityType.FOX, 8, 2, 4)
+ *             .spawn(EntityTypes.FOX, 8, 2, 4)
  *             .addFeature(GenerationStep.Decoration.VEGETAL_DECORATION, ModPlacedFeatures.APPLE_TREE)
  *             .features(BiomeDefaultFeatures::addMeadowVegetation)
  *             .build());

@@ -13,7 +13,7 @@ import net.biome.api.impl.BiomeApiBiomeSource;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestDedicatedServerContext;
-import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerConnection;
+import net.fabricmc.fabric.api.client.gametest.v1.context.TestDedicatedServerConnection;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.BlockPos;
@@ -87,13 +87,13 @@ public class BiomeCompatClientGameTest implements FabricClientGameTest {
 				.setUseConsistentSettings(false)
 				.adjustSettings(s -> s.setSeed("424242"))
 				.create()) {
-			world.getClientLevel().waitForChunksRender();
+			world.getConnection().waitForChunksRender();
 			BlockPos red = world.getServer().computeOnServer(this::checkServer);
 			if (red != null) {
 				world.getServer().runCommand("gamemode spectator @a");
 				world.getServer().runCommand("tp @a " + red.getX() + " " + (red.getY() + 30) + " " + red.getZ() + " 0 60");
 				context.waitTicks(40);
-				world.getClientLevel().waitForChunksRender();
+				world.getConnection().waitForChunksRender();
 				screenshot(context, "red_plains");
 			}
 			if (FabricLoader.getInstance().isModLoaded("chunky")) {
@@ -108,7 +108,7 @@ public class BiomeCompatClientGameTest implements FabricClientGameTest {
 					.adjustSettings(s -> s.setSeed("424242"))
 					.createServer()) {
 				BlockPos red = server.computeOnServer(s -> surfaceOf(s.overworld(), BiomeTestMod.RED_PLAINS));
-				try (TestServerConnection connection = server.connect()) {
+				try (TestDedicatedServerConnection connection = server.connect()) {
 					server.runCommand("op @a");
 					server.runCommand("gamemode spectator @a");
 					List<ResourceKey<Biome>> compare = new ArrayList<>(List.of(BiomeTestMod.RED_PLAINS));
@@ -122,7 +122,7 @@ public class BiomeCompatClientGameTest implements FabricClientGameTest {
 						}
 						server.runCommand("tp @a " + pos.getX() + " " + (pos.getY() + 30) + " " + pos.getZ() + " 0 60");
 						context.waitTicks(40);
-						connection.getClientLevel().waitForChunksRender();
+						connection.waitForChunksRender();
 						String onServer = server.computeOnServer(s -> s.overworld().getBiome(pos).getRegisteredName());
 						String onClient = context.computeOnClient(mc -> mc.level.getBiome(pos).getRegisteredName());
 						expect(onServer.equals(onClient) && onServer.equals(biome.identifier().toString()),
@@ -164,7 +164,7 @@ public class BiomeCompatClientGameTest implements FabricClientGameTest {
 		BlockPos red = surfaceOf(overworld, BiomeTestMod.RED_PLAINS);
 		surfaceRule(overworld, red, BiomeTestMod.RED_PLAINS, Blocks.RED_SAND, "our surface rule (red plains -> red sand)");
 		if (FabricLoader.getInstance().isModLoaded("terrablender")) {
-			surfaceRule(overworld, surfaceOf(overworld, BiomeTestMod.TB_MEADOW), BiomeTestMod.TB_MEADOW, Blocks.BLUE_TERRACOTTA,
+			surfaceRule(overworld, surfaceOf(overworld, BiomeTestMod.TB_MEADOW), BiomeTestMod.TB_MEADOW, Blocks.DYED_TERRACOTTA.blue(),
 					"TerraBlender surface rule (tb_meadow -> blue terracotta)");
 		}
 		BlockPos desert = surfaceOf(overworld, Biomes.DESERT);
