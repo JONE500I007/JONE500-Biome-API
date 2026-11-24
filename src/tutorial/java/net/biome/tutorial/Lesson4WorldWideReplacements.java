@@ -4,7 +4,7 @@ import net.biome.api.region.BiomeReplacements;
 import net.minecraft.world.level.biome.Biomes;
 
 /**
- * <h2>Lesson 3: replacing a vanilla biome everywhere (no region)</h2>
+ * <h2>Lesson 4: replacing a vanilla biome everywhere (no region)</h2>
  *
  * A region only changes biomes inside its own patches. {@link BiomeReplacements} works on the <b>whole</b> world,
  * vanilla patches included. There are two kinds:
@@ -19,11 +19,11 @@ import net.minecraft.world.level.biome.Biomes;
  *
  * <p>Cave biomes and ocean biomes can be replaced too: here lush caves become mint meadow.
  *
- * <p>Want several biomes by weight instead of one? See {@code WeightedBiomes} in {@link Lesson5Nether}; it works
+ * <p>Want several biomes by weight instead of one? See {@code WeightedBiomes} in {@link Lesson6Nether}; it works
  * with {@code BiomeReplacements.replace(original, weightedBiomes)} too.
  */
-public final class Lesson3WorldWideReplacements {
-	private Lesson3WorldWideReplacements() {
+public final class Lesson4WorldWideReplacements {
+	private Lesson4WorldWideReplacements() {
 	}
 
 	static void init() {

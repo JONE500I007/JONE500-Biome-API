@@ -10,12 +10,14 @@ import net.minecraft.resources.Identifier;
  * <ol>
  *   <li>{@link TutorialBiomes}: biome keys, and where each biome's JSON file comes from</li>
  *   <li>{@link Lesson1FirstRegion}: a region that swaps vanilla biomes for yours, and a biome with its own climate</li>
- *   <li>{@link Lesson2ExclusiveBiomes}: two biomes that never appear in the same patch</li>
- *   <li>{@link Lesson3WorldWideReplacements}: replacing a vanilla biome everywhere, without a region</li>
- *   <li>{@link Lesson4SurfaceRules}: which blocks make up the ground of your biome</li>
- *   <li>{@link Lesson5Nether}: Nether regions, a Nether biome at its own point, several biomes by weight</li>
- *   <li>{@link Lesson6End}: End regions and End surface rules</li>
- *   <li>{@link TutorialDataGen}: making biome JSON with {@code BiomeMaker}, and vanilla tags (structures, mob
+ *   <li>{@link Lesson2OwnClimateRegion}: a region that only adds biomes (no replace), with your own climate values,
+ *       {@code strict()} and a cave biome</li>
+ *   <li>{@link Lesson3ExclusiveBiomes}: two biomes that never appear in the same patch</li>
+ *   <li>{@link Lesson4WorldWideReplacements}: replacing a vanilla biome everywhere, without a region</li>
+ *   <li>{@link Lesson5SurfaceRules}: which blocks make up the ground of your biome</li>
+ *   <li>{@link Lesson6Nether}: Nether regions, a Nether biome at its own point, several biomes by weight</li>
+ *   <li>{@link Lesson7End}: End regions and End surface rules</li>
+ *   <li>{@link TutorialDataGen} (Lesson 8): making biome JSON with {@code BiomeMaker}, and vanilla tags (structures, mob
  *       variants) with {@code VanillaBiomeTags}</li>
  * </ol>
  *
@@ -34,11 +36,12 @@ public class TutorialMod implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		Lesson1FirstRegion.init();
-		Lesson2ExclusiveBiomes.init();
-		Lesson3WorldWideReplacements.init();
-		Lesson4SurfaceRules.init();
-		Lesson5Nether.init();
-		Lesson6End.init();
+		Lesson2OwnClimateRegion.init();
+		Lesson3ExclusiveBiomes.init();
+		Lesson4WorldWideReplacements.init();
+		Lesson5SurfaceRules.init();
+		Lesson6Nether.init();
+		Lesson7End.init();
 	}
 
 	public static Identifier id(String path) {

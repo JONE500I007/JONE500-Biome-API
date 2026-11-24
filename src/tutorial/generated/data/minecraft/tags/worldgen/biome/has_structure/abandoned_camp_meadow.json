@@ -3,6 +3,7 @@
     {
       "id": "biome_tutorial:mint_meadow",
       "required": false
-    }
+    },
+    "biome_tutorial:highland_meadow"
   ]
 }

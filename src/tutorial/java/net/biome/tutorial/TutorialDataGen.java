@@ -24,7 +24,7 @@ import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.level.biome.Biome;
 
 /**
- * <h2>Lesson 7: making biomes in Java (data generation)</h2>
+ * <h2>Lesson 8: making biomes in Java (data generation)</h2>
  *
  * Writing biome JSON by hand is long and easy to get wrong. {@link BiomeMaker} builds the biome in Java, with
  * vanilla's defaults already in: {@code BiomeMaker.overworld(context)} has the normal ores, caves, springs and
@@ -58,6 +58,8 @@ public class TutorialDataGen implements DataGeneratorEntrypoint {
 			@Override
 			protected void configure(HolderLookup.Provider lookup, Entries entries) {
 				entries.add(lookup.lookupOrThrow(Registries.BIOME), TutorialBiomes.ORANGE_HILLS);
+				entries.add(lookup.lookupOrThrow(Registries.BIOME), TutorialBiomes.HIGHLAND_MEADOW);
+				entries.add(lookup.lookupOrThrow(Registries.BIOME), TutorialBiomes.CRYSTAL_CAVES);
 				entries.add(lookup.lookupOrThrow(Registries.BIOME), TutorialBiomes.EMBER_FOREST);
 				entries.add(lookup.lookupOrThrow(Registries.BIOME), TutorialBiomes.SULFUR_WASTES);
 				entries.add(lookup.lookupOrThrow(Registries.BIOME), TutorialBiomes.BONE_FIELDS);
@@ -82,6 +84,9 @@ public class TutorialDataGen implements DataGeneratorEntrypoint {
 				VanillaBiomeTags.copy(Biomes.CHERRY_GROVE, TutorialBiomes.AMBER_MEADOW, (tag, biome) -> builder(tag).addOptional(biome));
 				// Orange hills: like a savanna (warm cows/pigs/chickens, spotted wolves), but no villages.
 				VanillaBiomeTags.copy(Biomes.SAVANNA, TutorialBiomes.ORANGE_HILLS, VanillaBiomeTags.NO_VILLAGES, (tag, biome) -> builder(tag).add(biome));
+				// Lesson 2: highland meadow is like a meadow (villages, cow and wolf variants); crystal caves like dripstone caves.
+				VanillaBiomeTags.copy(Biomes.MEADOW, TutorialBiomes.HIGHLAND_MEADOW, (tag, biome) -> builder(tag).add(biome));
+				VanillaBiomeTags.copy(Biomes.DRIPSTONE_CAVES, TutorialBiomes.CRYSTAL_CAVES, (tag, biome) -> builder(tag).add(biome));
 				// Nether / End biomes: fortresses, bastions, is_nether... / end cities, is_end
 				VanillaBiomeTags.copy(Biomes.CRIMSON_FOREST, TutorialBiomes.EMBER_FOREST, (tag, biome) -> builder(tag).add(biome));
 				VanillaBiomeTags.copy(Biomes.NETHER_WASTES, TutorialBiomes.SULFUR_WASTES, (tag, biome) -> builder(tag).add(biome));
@@ -118,6 +123,29 @@ public class TutorialDataGen implements DataGeneratorEntrypoint {
 				// order than another biome (e.g. flowers before grass) causes a "Feature order cycle" crash.
 				.features(BiomeDefaultFeatures::addPlainGrass)
 				.features(BiomeDefaultFeatures::addMeadowVegetation)
+				.build());
+
+		// Lesson 2: a cold green meadow high in the hills. Same vanilla helpers in the same order as orange hills.
+		context.register(TutorialBiomes.HIGHLAND_MEADOW, BiomeMaker.overworld(context)
+				.temperature(0.3F)
+				.downfall(0.6F)
+				.grassColor(0x6FCF8A)
+				.foliageColor(0x5FB07A)
+				.music(SoundEvents.MUSIC_BIOME_MEADOW)
+				.farmAnimals()
+				.defaultMonsters()
+				.features(BiomeDefaultFeatures::addPlainGrass)
+				.features(BiomeDefaultFeatures::addMeadowVegetation)
+				.build());
+
+		// Lesson 2: a cave biome (only underground). Blue fog and glowing particles; the caves and ores are vanilla's.
+		context.register(TutorialBiomes.CRYSTAL_CAVES, BiomeMaker.overworld(context)
+				.temperature(0.5F)
+				.downfall(0.5F)
+				.fogColor(0x6FA8DC)
+				.waterColor(0x3FD0E0)
+				.particles(ParticleTypes.END_ROD, 0.004F)
+				.defaultMonsters()
 				.build());
 
 		// Nether biome with floating particles and its own loop sound.

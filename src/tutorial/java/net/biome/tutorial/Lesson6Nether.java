@@ -10,7 +10,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.levelgen.material.MaterialRules;
 
 /**
- * <h2>Lesson 5: the Nether</h2>
+ * <h2>Lesson 6: the Nether</h2>
  *
  * Add {@code .nether()} and a region works in the Nether, with its own patches, weights and chances, just like in
  * the Overworld.
@@ -25,16 +25,16 @@ import net.minecraft.world.level.levelgen.material.MaterialRules;
  * {@link WeightedBiomes}. No climate needed: the region's patches are cut into cells and each cell picks one biome
  * by weight. Use {@code .keepOriginal(weight)} in the builder if some cells should stay vanilla.
  *
- * <p><b>Surface rule:</b> the floor of ember forests is magma, like Lesson 4 but with {@code addNether}.
+ * <p><b>Surface rule:</b> the floor of ember forests is magma, like Lesson 5 but with {@code addNether}.
  *
  * <p>Your Nether biome also needs vanilla's Nether tags (fortresses, bastions, {@code is_nether}): see
  * {@link TutorialDataGen}.
  */
-public final class Lesson5Nether {
+public final class Lesson6Nether {
 	public static final Identifier EMBERS = TutorialMod.id("embers");
 	public static final Identifier WASTES = TutorialMod.id("wastes");
 
-	private Lesson5Nether() {
+	private Lesson6Nether() {
 	}
 
 	static void init() {
