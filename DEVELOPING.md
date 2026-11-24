@@ -9,7 +9,7 @@ Notes for working on the Biome API itself. To **use** it in a mod, see [README.m
 | `src/main/java/net/biome/api/region`, `.../surface`, `.../climate`, `.../biome` | **Public API** (keep stable, see versioning) |
 | `src/main/java/net/biome/api/impl` | Internal code, can change any time |
 | `src/main/java/net/biome/api/mixin` | Hooks into Minecraft |
-| `src/tutorial/java/net/biome/tutorial` | Tutorial mod (`biome_tutorial`) for users of the API: one lesson per file (regions, exclusive biomes, replacements, surface rules, Nether, End, data generation) |
+| `src/tutorial/java/net/biome/tutorial` | Tutorial mod (`biome_tutorial`) for users of the API: one lesson per file (regions, own climate, exclusive biomes, replacements, surface rules, Nether, End, data generation) |
 | `src/tutorial/java/net/biome/tutorial/test` | Automated tests (game tests, client game tests, compat tests, `ReadmeExamples` = the README code must compile). They use the tutorial's biomes and regions, so change a lesson only together with its tests |
 | `docs/research-terrablender-biolith.md` | How TerraBlender and Biolith work (reference for design decisions) |
 

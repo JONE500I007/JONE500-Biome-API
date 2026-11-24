@@ -5,7 +5,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.biome.Biomes;
 
 /**
- * <h2>Lesson 2: biomes that should not appear together</h2>
+ * <h2>Lesson 3: biomes that should not appear together</h2>
  *
  * Meadows and cherry groves often touch each other. This region turns meadows into mint meadows and cherry
  * groves into amber meadows, but two light-green and orange meadows side by side would look odd.
@@ -15,10 +15,10 @@ import net.minecraft.world.level.biome.Biomes;
  *
  * <p>No {@code .overworld()} here: the Overworld is the default.
  */
-public final class Lesson2ExclusiveBiomes {
+public final class Lesson3ExclusiveBiomes {
 	public static final Identifier MEADOWS = TutorialMod.id("meadows");
 
-	private Lesson2ExclusiveBiomes() {
+	private Lesson3ExclusiveBiomes() {
 	}
 
 	static void init() {

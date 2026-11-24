@@ -71,8 +71,9 @@ public class BiomeServerGameTest {
 	@GameTest(maxTicks = 20)
 	public void regionsAreSortedById(GameTestHelper ctx) {
 		List<BiomeRegion> all = BiomeRegions.getAll(RegionDimension.OVERWORLD);
-		ctx.assertTrue(all.size() == 2, Component.literal("expected 2 regions, got " + all.size()));
-		ctx.assertTrue(all.get(0).getId().equals(Lesson2ExclusiveBiomes.MEADOWS) && all.get(1).getId().equals(Lesson1FirstRegion.WARM),
+		ctx.assertTrue(all.size() == 3, Component.literal("expected 3 regions, got " + all.size()));
+		ctx.assertTrue(all.get(0).getId().equals(Lesson2OwnClimateRegion.HIGHLANDS) && all.get(1).getId().equals(Lesson3ExclusiveBiomes.MEADOWS)
+				&& all.get(2).getId().equals(Lesson1FirstRegion.WARM),
 				Component.literal("regions not sorted by id: " + all));
 		ctx.succeed();
 	}
@@ -146,11 +147,11 @@ public class BiomeServerGameTest {
 		ctx.succeed();
 	}
 
-	/** Patch shares follow the weights: vanilla 10, meadows 2, warm 3 (= 66.7% / 13.3% / 20%). */
+	/** Patch shares follow the weights: vanilla 10, highlands 2, meadows 2, warm 3 (of 17). */
 	@GameTest(maxTicks = 20)
 	public void regionSharesFollowWeights(GameTestHelper ctx) {
 		RegionLayout layout = World.create(ctx, SEED).lookup.getLayout();
-		int[] counts = new int[3];
+		int[] counts = new int[4];
 		int total = 0;
 		for (int x = -150; x < 150; x++) {
 			for (int z = -150; z < 150; z++) {
@@ -158,9 +159,47 @@ public class BiomeServerGameTest {
 				total++;
 			}
 		}
-		checkShare(ctx, "vanilla", counts[0], total, 10.0 / 15.0);
-		checkShare(ctx, "meadows", counts[1], total, 2.0 / 15.0);
-		checkShare(ctx, "warm", counts[2], total, 3.0 / 15.0);
+		checkShare(ctx, "vanilla", counts[0], total, 10.0 / 17.0);
+		checkShare(ctx, "highlands", counts[1], total, 2.0 / 17.0);
+		checkShare(ctx, "meadows", counts[2], total, 2.0 / 17.0);
+		checkShare(ctx, "warm", counts[3], total, 3.0 / 17.0);
+		ctx.succeed();
+	}
+
+	/**
+	 * Lesson 2: a region that only adds biomes. Highland meadow and crystal caves appear, and only inside the
+	 * highlands region.
+	 */
+	@GameTest(maxTicks = 20)
+	public void ownClimateRegionWorks(GameTestHelper ctx) {
+		World w = World.create(ctx, SEED);
+		int meadow = 0;
+		int caves = 0;
+		for (int i = 0; i < 160; i++) {
+			for (int j = 0; j < 160; j++) {
+				int qx = (i - 80) * 40;
+				int qz = (j - 80) * 40;
+				for (int qy = -8; qy <= 40; qy += 8) {
+					ResourceKey<Biome> key = w.biomeAt(qx, qy, qz).unwrapKey().orElseThrow();
+					boolean isMeadow = key.equals(TutorialBiomes.HIGHLAND_MEADOW);
+					boolean isCave = key.equals(TutorialBiomes.CRYSTAL_CAVES);
+					if (!isMeadow && !isCave) {
+						continue;
+					}
+					BiomeRegion region = w.lookup.getRegionAt(qx, qz);
+					ctx.assertTrue(region != null && region.getId().equals(Lesson2OwnClimateRegion.HIGHLANDS),
+							Component.literal(key.identifier() + " outside of the highlands region at " + qx + "," + qz));
+					if (isMeadow) {
+						meadow++;
+					} else {
+						caves++;
+					}
+				}
+			}
+		}
+		JONE500BiomeAPI.LOGGER.info("[test] own climate region: highland_meadow={} crystal_caves={}", meadow, caves);
+		ctx.assertTrue(meadow > 0, Component.literal("highland meadow never appeared"));
+		ctx.assertTrue(caves > 0, Component.literal("crystal caves never appeared"));
 		ctx.succeed();
 	}
 
@@ -551,7 +590,7 @@ public class BiomeServerGameTest {
 				if (biome.is(TutorialBiomes.EMBER_FOREST)) {
 					ember++;
 					BiomeRegion region = lookup.getRegionAt(qx, qz);
-					ctx.assertTrue(region != null && region.getId().equals(Lesson5Nether.EMBERS),
+					ctx.assertTrue(region != null && region.getId().equals(Lesson6Nether.EMBERS),
 							Component.literal("ember forest outside the embers region at " + qx + "," + qz));
 				}
 				if (biome.is(Biomes.CRIMSON_FOREST)) crimson++;
@@ -615,7 +654,7 @@ public class BiomeServerGameTest {
 				int qz = (j - 80) * 32;
 				Holder<Biome> biome = source.getNoiseBiome(qx, 16, qz, sampler);
 				BiomeRegion region = lookup.getRegionAt(qx, qz);
-				boolean inside = region != null && region.getId().equals(Lesson6End.ASHLANDS);
+				boolean inside = region != null && region.getId().equals(Lesson7End.ASHLANDS);
 				if (inside) regionSamples++;
 				if (biome.is(TutorialBiomes.ASH_BARRENS)) {
 					ash++;
@@ -835,7 +874,7 @@ public class BiomeServerGameTest {
 				int qz = (j - 100) * 16;
 				Holder<Biome> biome = source.getNoiseBiome(qx, 16, qz, sampler);
 				BiomeRegion region = lookup.getRegionAt(qx, qz);
-				boolean inside = region != null && region.getId().equals(Lesson5Nether.WASTES);
+				boolean inside = region != null && region.getId().equals(Lesson6Nether.WASTES);
 				if (biome.is(TutorialBiomes.SULFUR_WASTES) || biome.is(TutorialBiomes.BONE_FIELDS)) {
 					if (!inside) outside++;
 					if (biome.is(TutorialBiomes.SULFUR_WASTES)) sulfur++;

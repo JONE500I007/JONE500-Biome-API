@@ -4,6 +4,7 @@
       "id": "biome_tutorial:red_plains",
       "required": false
     },
-    "biome_tutorial:orange_hills"
+    "biome_tutorial:orange_hills",
+    "biome_tutorial:crystal_caves"
   ]
 }

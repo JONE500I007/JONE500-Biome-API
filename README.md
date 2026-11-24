@@ -22,7 +22,8 @@ the registered regions, picked by weight (vanilla = 10). Inside your region the 
 exactly vanilla, but the vanilla biomes you replaced become your biomes.
 
 > **Learn from code:** [`src/tutorial`](src/tutorial/java/net/biome/tutorial) is a complete mod that uses Biome
-> API, one lesson per file with comments: your first region, exclusive biomes, world-wide replacements, surface
+> API, one lesson per file with comments: your first region, a region with only your own climate values (no replace,
+> `strict()`, a cave biome), exclusive biomes, world-wide replacements, surface
 > rules, the Nether, the End, and making biomes with `BiomeMaker` in data generation. Start with
 > [`TutorialMod.java`](src/tutorial/java/net/biome/tutorial/TutorialMod.java).
 

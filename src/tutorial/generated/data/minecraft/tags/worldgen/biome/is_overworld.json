@@ -16,6 +16,8 @@
       "id": "biome_tutorial:amber_meadow",
       "required": false
     },
-    "biome_tutorial:orange_hills"
+    "biome_tutorial:orange_hills",
+    "biome_tutorial:highland_meadow",
+    "biome_tutorial:crystal_caves"
   ]
 }
