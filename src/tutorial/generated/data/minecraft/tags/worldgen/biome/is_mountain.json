@@ -7,6 +7,7 @@
     {
       "id": "biome_tutorial:amber_meadow",
       "required": false
-    }
+    },
+    "biome_tutorial:highland_meadow"
   ]
 }

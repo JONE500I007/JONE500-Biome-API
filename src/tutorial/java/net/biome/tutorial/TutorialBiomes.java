@@ -15,7 +15,7 @@ import net.minecraft.world.level.biome.Biome;
  * <ul>
  *   <li><b>Written by hand:</b> red plains, blue forest, mint meadow and amber meadow are recolored copies of vanilla
  *       biomes, in {@code src/tutorial/resources/data/biome_tutorial/worldgen/biome/}.</li>
- *   <li><b>Data generation:</b> orange hills and the Nether and End biomes are made in Java with
+ *   <li><b>Data generation:</b> orange hills, highland meadow, crystal caves and the Nether and End biomes are made in Java with
  *       {@code BiomeMaker} (see {@link TutorialDataGen}). The Gradle task {@code runDatagen} writes their JSON to
  *       {@code src/tutorial/generated/}.</li>
  * </ul>
@@ -28,6 +28,8 @@ public final class TutorialBiomes {
 	public static final ResourceKey<Biome> AMBER_MEADOW = key("amber_meadow");
 	// Overworld, made with BiomeMaker
 	public static final ResourceKey<Biome> ORANGE_HILLS = key("orange_hills");
+	public static final ResourceKey<Biome> HIGHLAND_MEADOW = key("highland_meadow");
+	public static final ResourceKey<Biome> CRYSTAL_CAVES = key("crystal_caves");
 	// Nether, made with BiomeMaker
 	public static final ResourceKey<Biome> EMBER_FOREST = key("ember_forest");
 	public static final ResourceKey<Biome> SULFUR_WASTES = key("sulfur_wastes");

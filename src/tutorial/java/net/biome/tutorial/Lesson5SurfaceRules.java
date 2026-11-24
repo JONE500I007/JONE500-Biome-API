@@ -5,7 +5,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.levelgen.SurfaceRules;
 
 /**
- * <h2>Lesson 4: surface rules (the ground of your biome)</h2>
+ * <h2>Lesson 5: surface rules (the ground of your biome)</h2>
  *
  * Grass, sand, terracotta: the top blocks of the ground are not in the biome JSON, they come from the
  * dimension's <b>surface rules</b>. With {@link BiomeSurfaceRules} you add your own rule, and the API puts it in
@@ -18,10 +18,10 @@ import net.minecraft.world.level.levelgen.SurfaceRules;
  * ({@code waterBlockCheck(-1, 0)}), the block is red sand. Everything else stays vanilla.
  *
  * <p>The id ({@code red_plains_sand}) only names the rule: rules are sorted by id, like regions.
- * Nether and End rules work the same way with {@code addNether} and {@code addEnd} (Lessons 5 and 6).
+ * Nether and End rules work the same way with {@code addNether} and {@code addEnd} (Lessons 6 and 7).
  */
-public final class Lesson4SurfaceRules {
-	private Lesson4SurfaceRules() {
+public final class Lesson5SurfaceRules {
+	private Lesson5SurfaceRules() {
 	}
 
 	static void init() {

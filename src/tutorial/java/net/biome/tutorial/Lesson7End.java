@@ -10,7 +10,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.levelgen.SurfaceRules;
 
 /**
- * <h2>Lesson 6: the End</h2>
+ * <h2>Lesson 7: the End</h2>
  *
  * The End has no climate: its biome comes from the terrain (highlands, midlands, barrens, small islands). So an
  * End region ({@code .end()}) can only <b>replace</b> those biomes inside its patches; {@code addBiome} can't be
@@ -23,17 +23,17 @@ import net.minecraft.world.level.levelgen.SurfaceRules;
  *   <li><b>Ashlands region:</b> in its patches, barrens become ash barrens, and midlands too in half of the
  *       patches.</li>
  *   <li><b>Whole-biome swap:</b> in every world, small End islands become void meadows
- *       ({@code BiomeReplacements} from Lesson 3 works in the End too).</li>
+ *       ({@code BiomeReplacements} from Lesson 4 works in the End too).</li>
  * </ul>
  * Plus an End surface rule ({@code addEnd}): the ground of ash barrens is smooth basalt instead of end stone.
  *
  * <p>Tip: the main End island is always vanilla. Fly to the outer islands (through an End gateway) to see these
  * biomes.
  */
-public final class Lesson6End {
+public final class Lesson7End {
 	public static final Identifier ASHLANDS = TutorialMod.id("ashlands");
 
-	private Lesson6End() {
+	private Lesson7End() {
 	}
 
 	static void init() {

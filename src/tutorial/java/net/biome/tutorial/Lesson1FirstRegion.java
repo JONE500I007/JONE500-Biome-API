@@ -25,12 +25,12 @@ import net.minecraft.world.level.biome.Biomes;
  *       climate is, orange hills replace whatever vanilla biome would be there.</li>
  * </ul>
  *
- * <p><b>Weight:</b> vanilla patches have weight 10. This region has 3 and Lesson 2's has 2, so with only this mod
- * about 3 of every 15 patches are this region. Decimals work too: {@code weight(0.25F)} is a very rare region.
+ * <p><b>Weight:</b> vanilla patches have weight 10. This region has 3, and the regions of Lessons 2 and 3 have 2
+ * each, so with only this mod about 3 of every 17 patches are this region. Decimals work too: {@code weight(0.25F)} is a very rare region.
  *
  * <p><b>Climate:</b> {@link ClimatePoints} uses named values ({@link Temperature#WARM},
  * {@link Continentalness#FAR_INLAND}, ...) so you don't need vanilla's raw numbers. Leave a value out and any
- * value is fine. Add {@code .strict()} to the {@code ClimatePoints} if your inland biome must never show up in the sea.
+ * value is fine. Lesson 2 shows more: your own numbers, {@code strict()}, cave biomes.
  *
  * <p><b>Ids:</b> regions are sorted by id, so the same seed always gives the same world, whatever order mods
  * load in.
