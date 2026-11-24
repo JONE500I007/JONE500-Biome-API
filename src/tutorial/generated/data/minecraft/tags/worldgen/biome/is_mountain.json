@@ -1,0 +1,12 @@
+{
+  "values": [
+    {
+      "id": "biome_tutorial:mint_meadow",
+      "required": false
+    },
+    {
+      "id": "biome_tutorial:amber_meadow",
+      "required": false
+    }
+  ]
+}

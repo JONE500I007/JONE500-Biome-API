@@ -1,0 +1,9 @@
+{
+  "values": [
+    {
+      "id": "biome_tutorial:red_plains",
+      "required": false
+    },
+    "biome_tutorial:orange_hills"
+  ]
+}
