@@ -3,7 +3,12 @@
 	"id": "jone500-biome-api",
 	"version": "${version}",
 	"name": "JONE500 Biome API",
-	"description": "A library for adding Overworld biomes in regions that are deterministic (sorted by id) and can swap or skip biomes per region patch.",
+	"description": "A library for adding Overworld, Nether and End biomes in regions that are deterministic (sorted by id), with per-patch chances, weighted biomes, world-wide replacements and surface rules.",
+	"contact": {
+		"homepage": "https://github.com/JONE500I007/JONE500-Biome-API",
+		"sources": "https://github.com/JONE500I007/JONE500-Biome-API",
+		"issues": "https://github.com/JONE500I007/JONE500-Biome-API/issues"
+	},
 	"authors": [
 		"JONE500"
 	],
