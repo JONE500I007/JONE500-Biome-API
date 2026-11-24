@@ -44,6 +44,57 @@ dependencies {
 }
 ```
 
+### Getting Biome API from CurseForge instead (CurseMaven)
+
+Biome API is also on [CurseForge](https://www.curseforge.com/minecraft/mc-mods/jone500-biome-api).
+CurseForge has no Maven of its own, so you use **CurseMaven**, a free service that turns CurseForge
+files into Gradle dependencies. Use it in place of the Modrinth repository above (you don't need
+both).
+
+**1. Find the IDs.** On CurseForge, open **Files** and click the file for **your** Minecraft version:
+
+- **Project ID** (in the box on the **right** side of the page): the same for every file.
+- **File ID** (in the file's details, under **FILE ID**): different for every file / Minecraft version.
+
+The small button next to each number copies it.
+
+**2. Add CurseMaven to `build.gradle`:**
+
+```groovy
+repositories {
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = "CurseMaven"
+                url = "https://cursemaven.com"
+            }
+        }
+        filter {
+            includeGroup "curse.maven"
+        }
+    }
+}
+
+dependencies {
+    implementation "curse.maven:jone500-biome-api-1111111:2222222"
+}
+```
+
+The dependency has three parts:
+
+```
+curse.maven:jone500-biome-api-1111111:2222222
+            └───────┬───────┘ └──┬──┘ └──┬──┘
+                    │            │       └── File ID (changes for every file / Minecraft version)
+                    │            └────────── Project ID of Biome API (always the same)
+                    └─────────────────────── any name you like, usually the mod's slug
+```
+
+`2222222` is the file for **Minecraft 26.2**. For another Minecraft version, replace only the last
+number with the File ID from step 1.
+
+**3.** The `fabric.mod.json` part is the same as above (`"jone500-biome-api": ">=1.0.0"`).
+
 ## 2. Make your biome
 
 Your biome needs a normal biome JSON in `data/<your mod id>/worldgen/biome/<name>.json`, like any other
@@ -717,7 +768,8 @@ BiomeReplacements.replaceWholeBiome(ModBiomes.APPLE_GROVE, ModBiomes.PEAR_GROVE,
 Good to know:
 - It works for biomes placed by a region (`.replace(...)` / `.addBiome(...)`), vanilla biomes and End biomes
   placed with Fabric API's `TheEndBiomes`. Biomes that another mod places with its own system (e.g.
-  TerraBlender) are not tested.
+  TerraBlender) are not tested as replacement targets. The mods themselves work together, see
+  [Works with other mods](#works-with-other-mods).
 - Replacements happen **once**, they don't chain: with `A -> B` and `B -> C`, the `A` places become `B`,
   not `C`.
 - Use `BiomeReplacements` for this. `BiomeRegion...replace(a, b)` only replaces the vanilla biome that
@@ -736,6 +788,21 @@ BiomeReplacements.setPatchSize(5);      // 3 to 10 (default 6 = about 256 blocks
 - Adding or removing a mod with regions changes where regions are in **new chunks** of existing worlds,
   like with any biome mod.
 - For modpacks: `BiomeRegions.setVanillaWeight(...)` and `BiomeRegions.setRegionSize(...)` (before a world loads).
+
+## Works with other mods
+
+Tested on Minecraft 26.2 with these mods, alone and together:
+
+- **TerraBlender** and **Biolith** (the other biome libraries): their biomes and ours appear in the same world
+- **Biomes O' Plenty**, **Terralith**, **Tectonic**
+- **Sodium**, **Lithium**, **C2ME** (multithreaded world generation), **FerriteCore**
+- **Chunky** (pre-generating worlds), **Distant Horizons**
+
+Good to know:
+
+- With **Terralith**, biomes added by **Biolith** mods show up less often. Our biomes still appear.
+- Regions Unexplored has no Minecraft 26.2 version yet, so it is not tested here.
+- No one can test every mod. If something breaks with another mod, please open an issue on [GitHub](https://github.com/JONE500I007/JONE500-Biome-API/issues).
 
 ## Supported versions
 
