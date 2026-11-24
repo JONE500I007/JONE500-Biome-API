@@ -1,0 +1,21 @@
+{
+  "values": [
+    {
+      "id": "biome_tutorial:red_plains",
+      "required": false
+    },
+    {
+      "id": "biome_tutorial:blue_forest",
+      "required": false
+    },
+    {
+      "id": "biome_tutorial:mint_meadow",
+      "required": false
+    },
+    {
+      "id": "biome_tutorial:amber_meadow",
+      "required": false
+    },
+    "biome_tutorial:orange_hills"
+  ]
+}

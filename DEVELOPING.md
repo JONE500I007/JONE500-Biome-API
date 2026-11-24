@@ -9,7 +9,8 @@ Notes for working on the Biome API itself. To **use** it in a mod, see [README.m
 | `src/main/java/net/biome/api/region`, `.../surface`, `.../climate`, `.../biome` | **Public API** (keep stable, see versioning) |
 | `src/main/java/net/biome/api/impl` | Internal code, can change any time |
 | `src/main/java/net/biome/api/mixin` | Hooks into Minecraft |
-| `src/testmod` | Example mod (Overworld regions, a Nether region, an End biome, replacements) + automated tests |
+| `src/tutorial/java/net/biome/tutorial` | Tutorial mod (`biome_tutorial`) for users of the API: one lesson per file (regions, exclusive biomes, replacements, surface rules, Nether, End, data generation) |
+| `src/tutorial/java/net/biome/tutorial/test` | Automated tests (game tests, client game tests, compat tests, `ReadmeExamples` = the README code must compile). They use the tutorial's biomes and regions, so change a lesson only together with its tests |
 | `docs/research-terrablender-biolith.md` | How TerraBlender and Biolith work (reference for design decisions) |
 
 Reference clones of TerraBlender and Biolith are in `D:\minecraft modding\biome-api-reference\`
@@ -41,7 +42,8 @@ Reference clones of TerraBlender and Biolith are in `D:\minecraft modding\biome-
 
 | Task | What it does |
 |---|---|
-| `runTestmodClient` | Minecraft with the API + testmod |
+| `runTutorialClient` | Minecraft with the API + the tutorial mod |
+| `runDatagen` | Writes the tutorial's generated biome JSON and tags to `src/tutorial/generated` |
 | `runGameTest` | Region logic tests on a dedicated server (biomes appear, sorting, same seed = same world, weights, chances, patch size) |
 | `runClientGameTest` | Real normal world: checks the Overworld got the regions, finds red plains, screenshot in `build/run/clientGameTest/screenshots` |
 | `build` | `build/libs/jone500-biome-api-<version>.jar` |

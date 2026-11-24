@@ -21,6 +21,11 @@ The Overworld is split into big patches (about 512 blocks apart). Each patch is 
 the registered regions, picked by weight (vanilla = 10). Inside your region the terrain and climate are
 exactly vanilla, but the vanilla biomes you replaced become your biomes.
 
+> **Learn from code:** [`src/tutorial`](src/tutorial/java/net/biome/tutorial) is a complete mod that uses Biome
+> API, one lesson per file with comments: your first region, exclusive biomes, world-wide replacements, surface
+> rules, the Nether, the End, and making biomes with `BiomeMaker` in data generation. Start with
+> [`TutorialMod.java`](src/tutorial/java/net/biome/tutorial/TutorialMod.java).
+
 ## 1. Add it to your mod
 
 ```groovy

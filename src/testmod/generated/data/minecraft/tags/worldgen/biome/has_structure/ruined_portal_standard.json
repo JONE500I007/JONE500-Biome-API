@@ -1,9 +1,0 @@
-{
-  "values": [
-    {
-      "id": "biome_test:red_plains",
-      "required": false
-    },
-    "biome_test:orange_hills"
-  ]
-}

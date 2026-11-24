@@ -1,0 +1,34 @@
+{
+	"schemaVersion": 1,
+	"id": "biome_tutorial",
+	"version": "${version}",
+	"name": "Biome API Tutorial",
+	"description": "Tutorial for JONE500 Biome API: regions, replacements, surface rules, Nether and End biomes. Start with net.biome.tutorial.TutorialMod. Dev only.",
+	"license": "MIT",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"net.biome.tutorial.TutorialMod",
+			"net.biome.tutorial.test.TestSetup"
+		],
+		"terrablender": [
+			"net.biome.tutorial.test.compat.TerraBlenderCompat"
+		],
+		"fabric-datagen": [
+			"net.biome.tutorial.TutorialDataGen"
+		],
+		"fabric-gametest": [
+			"net.biome.tutorial.test.BiomeServerGameTest",
+			"net.biome.tutorial.test.BiomeRobustnessGameTest"
+		],
+		"fabric-client-gametest": [
+			"net.biome.tutorial.test.BiomeClientGameTest",
+			"net.biome.tutorial.test.BiomeWorldGenClientGameTest",
+			"net.biome.tutorial.test.BiomeCompatClientGameTest"
+		]
+	},
+	"depends": {
+		"jone500-biome-api": "*",
+		"fabric-api": "*"
+	}
+}
