@@ -65,15 +65,15 @@ version, and copy the **File ID** number. Each Minecraft version has a different
 - **Project ID** (red arrow, in the box on the **right** side of the page): `1827672`. The same for
   every file.
 - **File ID** (blue arrow, in the file's details, under **FILE ID**): `9786628` in the picture (the
-  26.3 file). Different for every file. The small button next to each number copies it.
+  1.0.0 file for 26.3). Different for every file. The small button next to each number copies it.
 
-Biome API 1.0.0 files:
+Biome API 1.1.0 files:
 
 | Minecraft | File ID |
 |---|---|
-| 26.3 | `9786628` |
-| 26.2 | `9786626` |
-| 26.1 | `9786611` |
+| 26.3 | `9840696` |
+| 26.2 | `9840692` |
+| 26.1 | `9840689` |
 
 **2. Add CurseMaven to `build.gradle`:**
 
@@ -93,21 +93,21 @@ repositories {
 }
 
 dependencies {
-    implementation "curse.maven:jone500-biome-api-1827672:9786628"
+    implementation "curse.maven:jone500-biome-api-1827672:9840696"
 }
 ```
 
 The dependency has three parts:
 
 ```
-curse.maven:jone500-biome-api-1827672:9786628
+curse.maven:jone500-biome-api-1827672:9840696
             └───────┬───────┘ └──┬──┘ └──┬──┘
                     │            │       └── File ID (changes for every file / Minecraft version)
                     │            └────────── Project ID of Biome API (always 1827672)
                     └─────────────────────── any name you like, usually the mod's slug
 ```
 
-`9786628` is the file for **Minecraft 26.3**. For another Minecraft version, replace only the last
+`9840696` is the file for **Minecraft 26.3**. For another Minecraft version, replace only the last
 number with the File ID from step 1.
 
 **3.** The `fabric.mod.json` part is the same as above (`"jone500-biome-api": ">=1.0.0"`).
