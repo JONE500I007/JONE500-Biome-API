@@ -21,6 +21,8 @@ import net.minecraft.tags.BiomeTags;
 import net.biome.api.climate.Continentalness;
 import net.biome.api.climate.Depth;
 import net.biome.api.climate.Erosion;
+import net.biome.api.climate.Humidity;
+import net.biome.api.climate.Weirdness;
 import net.biome.api.climate.Temperature;
 import net.biome.api.climate.Terrain;
 import net.biome.api.impl.RegionBiomeLookup;
@@ -577,6 +579,79 @@ public class BiomeServerGameTest {
 					Climate.TargetPoint target = sampler.sample(qx, qy, qz);
 					if (target.continentalness() < inlandMin
 							&& lookup.getBiome(target, qx, qz, vanilla).is(TutorialBiomes.ORANGE_HILLS)) {
+						count++;
+					}
+				}
+			}
+		}
+		return count;
+	}
+
+	/**
+	 * overlay() (TerraBlender-style): with the same values the biome is much more common than without it, a single
+	 * temperature value (a "point") still gives a biome, and the result is the same every time.
+	 */
+	@GameTest(maxTicks = 20)
+	public void overlayPlacesBiomesLikeTerraBlender(GameTestHelper ctx) {
+		// The values of More Than Apples' apple grove (which came from TerraBlender).
+		java.util.function.Supplier<ClimatePoints.Builder> grove = () -> ClimatePoints.builder()
+				.temperature(Temperature.between(Temperature.NEUTRAL, Temperature.WARM))
+				.humidity(Humidity.between(Humidity.NEUTRAL, Humidity.WET))
+				.continentalness(Continentalness.MID_INLAND, Continentalness.INLAND)
+				.erosion(Erosion.EROSION_5, Erosion.EROSION_6)
+				.depth(-1.0F, 1.0F)
+				.weirdness(Weirdness.MID_SLICE_NORMAL_DESCENDING, Weirdness.LOW_SLICE_NORMAL_DESCENDING);
+		int normal = countBiome(ctx, grove.get());
+		int overlay = countBiome(ctx, grove.get().overlay());
+		int overlayAgain = countBiome(ctx, grove.get().overlay());
+		// A single temperature value, like More Than Apples' frosty apple.
+		java.util.function.Supplier<ClimatePoints.Builder> frosty = () -> ClimatePoints.builder()
+				.temperature(-0.45F, -0.45F)
+				.humidity(Humidity.between(Humidity.ARID, Humidity.NEUTRAL))
+				.continentalness(Continentalness.NEAR_INLAND, Continentalness.FAR_INLAND)
+				.erosion(Erosion.EROSION_5, Erosion.EROSION_6)
+				.depth(-1.0F, 1.0F)
+				.weirdness(Weirdness.MID_SLICE_NORMAL_ASCENDING, Weirdness.MID_SLICE_NORMAL_DESCENDING, Weirdness.VALLEY);
+		int frostyNormal = countBiome(ctx, frosty.get());
+		int frostyOverlay = countBiome(ctx, frosty.get().overlay());
+		JONE500BiomeAPI.LOGGER.info("[test] overlay: grove normal={} overlay={} (again {}), frosty normal={} overlay={}",
+				normal, overlay, overlayAgain, frostyNormal, frostyOverlay);
+		ctx.assertTrue(overlay == overlayAgain, Component.literal("overlay gave a different result the second time: " + overlay + " vs " + overlayAgain));
+		ctx.assertTrue(overlay > normal, Component.literal("overlay should be more common: " + overlay + " vs " + normal));
+		ctx.assertTrue(frostyOverlay > 0, Component.literal("overlay biome with a single temperature value never appeared"));
+		ctx.assertTrue(frostyOverlay > frostyNormal * 5, Component.literal("frosty overlay " + frostyOverlay + " vs normal " + frostyNormal));
+
+		// Far outside every range (hot, very dry, ocean, mountains, peaks): the rest boxes win, so never the overlay biome.
+		BiomeRegion region = BiomeRegion.builder(TutorialMod.id("overlay_test")).addBiome(grove.get().overlay(), TutorialBiomes.ORANGE_HILLS).build();
+		RegistryAccess registries = ctx.getLevel().registryAccess();
+		Climate.ParameterList<Holder<Biome>> vanilla = registries.lookupOrThrow(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST)
+				.getOrThrow(MultiNoiseBiomeSourceParameterLists.OVERWORLD).value().parameters();
+		RegionBiomeLookup lookup = RegionBiomeLookup.create(SEED, 7, 0.0F, List.of(region), vanilla, registries.lookupOrThrow(Registries.BIOME));
+		Climate.TargetPoint far = Climate.target(0.9F, -0.9F, -0.8F, -0.9F, 0.0F, 0.7F);
+		ctx.assertTrue(!lookup.getBiome(far, 0, 0, vanilla).is(TutorialBiomes.ORANGE_HILLS),
+				Component.literal("overlay biome placed far outside its ranges"));
+		Climate.TargetPoint inside = Climate.target(0.0F, 0.0F, 0.1F, 0.6F, 0.0F, -0.3F);
+		ctx.assertTrue(lookup.getBiome(inside, 0, 0, vanilla).is(TutorialBiomes.ORANGE_HILLS),
+				Component.literal("overlay biome missing inside its ranges"));
+		ctx.succeed();
+	}
+
+	/** How many samples get orange hills when the whole world is one region with only this climate. */
+	private static int countBiome(GameTestHelper ctx, ClimatePoints.Builder climate) {
+		BiomeRegion region = BiomeRegion.builder(TutorialMod.id("overlay_test")).addBiome(climate, TutorialBiomes.ORANGE_HILLS).build();
+		RegistryAccess registries = ctx.getLevel().registryAccess();
+		Climate.ParameterList<Holder<Biome>> vanilla = registries.lookupOrThrow(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST)
+				.getOrThrow(MultiNoiseBiomeSourceParameterLists.OVERWORLD).value().parameters();
+		Climate.Sampler sampler = TestWorldgen.sampler(TestWorldgen.randomState(registries, NoiseGeneratorSettings.OVERWORLD, SEED));
+		// vanilla weight 0: the whole world is this region
+		RegionBiomeLookup lookup = RegionBiomeLookup.create(SEED, 7, 0.0F, List.of(region), vanilla, registries.lookupOrThrow(Registries.BIOME));
+		int count = 0;
+		for (int i = 0; i < 100; i++) {
+			for (int j = 0; j < 100; j++) {
+				int qx = (i - 50) * 40;
+				int qz = (j - 50) * 40;
+				for (int qy = 16; qy <= 24; qy += 4) { // y = 64 .. 96: the surface
+					if (lookup.getBiome(sampler.sample(qx, qy, qz), qx, qz, vanilla).is(TutorialBiomes.ORANGE_HILLS)) {
 						count++;
 					}
 				}
