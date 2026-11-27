@@ -57,12 +57,23 @@ CurseForge has no Maven of its own, so you use **CurseMaven**, a free service th
 files into Gradle dependencies. Use it in place of the Modrinth repository above (you don't need
 both).
 
-**1. Find the IDs.** On CurseForge, open **Files** and click the file for **your** Minecraft version:
+**1. Find the file ID.** On CurseForge, open **Files**, click the file for **your** Minecraft
+version, and copy the **File ID** number. Each Minecraft version has a different file ID.
 
-- **Project ID** (in the box on the **right** side of the page): the same for every file.
-- **File ID** (in the file's details, under **FILE ID**): different for every file / Minecraft version.
+![CurseForge Files page: the File ID in the file's details, and the Project ID in the box on the right](docs/images/curseforge-project-and-file-id.png)
 
-The small button next to each number copies it.
+- **Project ID** (red arrow, in the box on the **right** side of the page): `1827672`. The same for
+  every file.
+- **File ID** (blue arrow, in the file's details, under **FILE ID**): `9786628` in the picture (the
+  26.3 file). Different for every file. The small button next to each number copies it.
+
+Biome API 1.0.0 files:
+
+| Minecraft | File ID |
+|---|---|
+| 26.3 | `9786628` |
+| 26.2 | `9786626` |
+| 26.1 | `9786611` |
 
 **2. Add CurseMaven to `build.gradle`:**
 
@@ -82,21 +93,21 @@ repositories {
 }
 
 dependencies {
-    implementation "curse.maven:jone500-biome-api-1111111:2222222"
+    implementation "curse.maven:jone500-biome-api-1827672:9786626"
 }
 ```
 
 The dependency has three parts:
 
 ```
-curse.maven:jone500-biome-api-1111111:2222222
+curse.maven:jone500-biome-api-1827672:9786626
             └───────┬───────┘ └──┬──┘ └──┬──┘
                     │            │       └── File ID (changes for every file / Minecraft version)
-                    │            └────────── Project ID of Biome API (always the same)
+                    │            └────────── Project ID of Biome API (always 1827672)
                     └─────────────────────── any name you like, usually the mod's slug
 ```
 
-`2222222` is the file for **Minecraft 26.2**. For another Minecraft version, replace only the last
+`9786626` is the file for **Minecraft 26.2**. For another Minecraft version, replace only the last
 number with the File ID from step 1.
 
 **3.** The `fabric.mod.json` part is the same as above (`"jone500-biome-api": ">=1.0.0"`).
