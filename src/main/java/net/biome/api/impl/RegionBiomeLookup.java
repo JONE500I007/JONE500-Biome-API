@@ -255,6 +255,7 @@ public final class RegionBiomeLookup {
 			points.add(Pair.of(pair.getFirst(), new Hit(pair.getFirst(), entry)));
 		}
 		List<Pair<Climate.ParameterPoint, Hit>> extras = new ArrayList<>(region.getExtraPoints().size());
+		List<Hit> overlay = new ArrayList<>();
 		for (BiomeRegion.ExtraPoint extra : region.getExtraPoints()) {
 			Optional<Holder.Reference<Biome>> holder = biomes.get(extra.biome());
 			if (holder.isEmpty()) {
@@ -262,19 +263,54 @@ public final class RegionBiomeLookup {
 						regionId, extra.biome().identifier());
 				continue;
 			}
-			extras.add(Pair.of(extra.point(), new Hit(extra.point(), newEntry(holder.get(), null, extra.strict() ? extra.point() : null,
-					extra.chance(), regionId, extra.biome(), groupOf, groupSaltOf))));
+			Hit extraHit = new Hit(extra.point(), newEntry(holder.get(), null, extra.strict() ? extra.point() : null,
+					extra.chance(), regionId, extra.biome(), groupOf, groupSaltOf));
+			if (extra.overlay()) {
+				overlay.add(extraHit);
+			} else {
+				extras.add(Pair.of(extra.point(), extraHit));
+			}
 			added.add(holder.get());
 		}
-		return new RegionTrees(new Climate.ParameterList<>(points), extras.isEmpty() ? null : new Climate.ParameterList<>(extras));
+		Overlay overlayPoints = overlay.isEmpty() ? null
+				: new Overlay(overlay.toArray(Hit[]::new), OverlayRest.boxes(overlay.stream().map(Hit::point).toList())
+						.toArray(Climate.ParameterPoint[]::new));
+		return new RegionTrees(new Climate.ParameterList<>(points), extras.isEmpty() ? null : new Climate.ParameterList<>(extras),
+				overlayPoints);
+	}
+
+	/**
+	 * A region's overlay points ({@code ClimatePoints.Builder.overlay()}) and the "rest" boxes they compete with
+	 * (see {@link OverlayRest}). There are only a few of each, so every lookup simply measures all of them: no
+	 * search tree, so the answer is the same on every thread, also when two are equally close.
+	 */
+	record Overlay(Hit[] points, Climate.ParameterPoint[] rest) {
+		/** The closest overlay point if it is at least as close as every rest box, else null. */
+		@Nullable Hit find(Climate.TargetPoint target) {
+			Hit best = null;
+			long bestFitness = Long.MAX_VALUE;
+			for (Hit point : points) {
+				long fitness = fitness(point.point(), target);
+				if (fitness < bestFitness) {
+					best = point;
+					bestFitness = fitness;
+				}
+			}
+			for (Climate.ParameterPoint box : rest) {
+				if (fitness(box, target) < bestFitness) {
+					return null;
+				}
+			}
+			return best;
+		}
 	}
 
 	/** A point of a region tree and what it means. */
 	record Hit(Climate.ParameterPoint point, Entry entry) {
 	}
 
-	/** The relabeled dimension points and the region's extra points (null if none). */
-	record RegionTrees(Climate.ParameterList<Hit> original, Climate.@Nullable ParameterList<Hit> extras) {
+	/** The relabeled dimension points, the region's extra points (null if none) and its overlay points (null if none). */
+	record RegionTrees(Climate.ParameterList<Hit> original, Climate.@Nullable ParameterList<Hit> extras, @Nullable Overlay overlay) {
 	}
 
 	/** Same as vanilla's (private) ParameterPoint.fitness: squared distance of the target to the point. */
@@ -313,6 +349,16 @@ public final class RegionBiomeLookup {
 			return vanilla.findValue(target);
 		}
 		RegionTrees regionTrees = trees[cell.region()];
+		if (regionTrees.overlay() != null) {
+			Hit overlayHit = regionTrees.overlay().find(target);
+			if (overlayHit != null) {
+				Entry overlay = overlayHit.entry();
+				if (isEnabled(overlay, cell) && (overlay.strictBox == null || isInside(overlay.strictBox, target))) {
+					return overlay.biome;
+				}
+				// not in this patch (chance / exclusive): the normal rules below decide
+			}
+		}
 		Hit hit = regionTrees.original().findValue(target);
 		if (regionTrees.extras() != null) {
 			Hit extraHit = regionTrees.extras().findValue(target);

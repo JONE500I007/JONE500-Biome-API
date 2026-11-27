@@ -127,8 +127,13 @@ public final class BiomeRegion {
 	 *               area keeps the biome vanilla would have placed there.
 	 * @param strict if true the biome is only used where the climate is really inside the point's ranges
 	 *               (see {@link ClimatePoints.Builder#strict()})
+	 * @param overlay if true the point is placed TerraBlender-style (see {@link ClimatePoints.Builder#overlay()})
 	 */
-	public record ExtraPoint(Climate.ParameterPoint point, ResourceKey<Biome> biome, float chance, boolean strict) {
+	public record ExtraPoint(Climate.ParameterPoint point, ResourceKey<Biome> biome, float chance, boolean strict, boolean overlay) {
+		/** A normal (not overlay) point, as in 1.0.0. */
+		public ExtraPoint(Climate.ParameterPoint point, ResourceKey<Biome> biome, float chance, boolean strict) {
+			this(point, biome, chance, strict, false);
+		}
 	}
 
 	public static final class Builder {
@@ -247,14 +252,14 @@ public final class BiomeRegion {
 
 		/** Like {@link #addBiome(Climate.ParameterPoint, ResourceKey)}, but only in a part of the patches. */
 		public Builder addBiome(Climate.ParameterPoint point, ResourceKey<Biome> biome, float chance) {
-			return addPoint(point, biome, chance, false);
+			return addPoint(point, biome, chance, false, false);
 		}
 
-		private Builder addPoint(Climate.ParameterPoint point, ResourceKey<Biome> biome, float chance, boolean strict) {
+		private Builder addPoint(Climate.ParameterPoint point, ResourceKey<Biome> biome, float chance, boolean strict, boolean overlay) {
 			Objects.requireNonNull(point, "point");
 			Objects.requireNonNull(biome, "biome");
 			checkChance(chance);
-			extraPoints.add(new ExtraPoint(point, biome, chance, strict));
+			extraPoints.add(new ExtraPoint(point, biome, chance, strict, overlay));
 			return this;
 		}
 
@@ -278,7 +283,7 @@ public final class BiomeRegion {
 				throw new IllegalArgumentException("Region " + id + ": no climate points given for " + biome.identifier());
 			}
 			for (Climate.ParameterPoint point : points) {
-				addPoint(point, biome, chance, climate.isStrict());
+				addPoint(point, biome, chance, climate.isStrict(), climate.isOverlay());
 			}
 			return this;
 		}

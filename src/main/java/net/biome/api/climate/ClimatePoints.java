@@ -68,6 +68,7 @@ public final class ClimatePoints {
 		private List<Climate.Parameter> depth = Depth.SURFACE.parameters();
 		private float offset;
 		private boolean strict;
+		private boolean overlay;
 
 		private Builder() {
 		}
@@ -226,6 +227,30 @@ public final class ClimatePoints {
 
 		public boolean isStrict() {
 			return strict;
+		}
+
+		/**
+		 * <b>Overlay mode</b> (TerraBlender-style placement, optional): inside its region the biome also wins
+		 * <i>around</i> its ranges, not only inside them, so it becomes bigger and more common.
+		 *
+		 * <p>Normally your biome has to beat the vanilla biome at each spot, and every vanilla biome fits its own
+		 * spot exactly, so your biome only appears where <b>all</b> values are inside your ranges. With overlay
+		 * mode it only has to beat "the rest": boxes made from the parts of each value outside your ranges (the
+		 * same rule TerraBlender's {@code VanillaParameterOverlayBuilder} uses). Where the climate is closer to
+		 * your ranges than to the rest, your biome is placed; elsewhere the normal rules apply (vanilla, other
+		 * points of the region, replacements).
+		 *
+		 * <p>Use it when you move biomes from TerraBlender: the same values then give the same result. All overlay
+		 * biomes of a region are worked out together, like the points of one TerraBlender region.
+		 * Chances and {@code exclusive(...)} work as usual.
+		 */
+		public Builder overlay() {
+			this.overlay = true;
+			return this;
+		}
+
+		public boolean isOverlay() {
+			return overlay;
 		}
 
 		/** One climate point for every combination of the values above. */

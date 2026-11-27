@@ -38,7 +38,7 @@ repositories {
 }
 
 dependencies {
-    implementation "maven.modrinth:jone500-biome-api:1.0.0+26.2"
+    implementation "maven.modrinth:jone500-biome-api:1.1.0+26.2"
 }
 ```
 
@@ -304,6 +304,8 @@ Inside the region your biome wins where its climate matches; elsewhere vanilla s
 | `terrain` | `VALLEY`, `LOW`, `MID`, `HIGH`, `PEAK` | Land shape: rivers → normal land → mountain peaks |
 | `depth` | see the table below | How high / deep |
 | `offset` | a number, e.g. `0.375F` | Makes the biome smaller at its edges (vanilla uses this for rare biomes) |
+| `.strict()` | - | Only exactly inside your ranges (see [below](#my-biome-appears-in-the-sea-strict-and-depth)) |
+| `.overlay()` | - | TerraBlender-style: also wins **around** your ranges, so the biome is bigger and more common (see [below](#my-biome-is-too-rare--coming-from-terrablender-overlay)). Since 1.1.0 |
 
 **Depth** is about 0 at the ground surface, positive below it and **negative above it** (air, and sea water
 above the sea floor):
@@ -352,6 +354,37 @@ Minecraft does not check "is this climate inside the ranges?". It picks the biom
 
 Measured with the same inland biome over a large area (times it landed in ocean/coast climate):
 `depth(-1, 1)` = 5779, `Depth.SURFACE` = 4, `Depth.SURFACE` + `strict()` = **0**.
+
+### My biome is too rare / coming from TerraBlender (`overlay()`)
+
+Normally your biome has to beat the **vanilla biome** at each spot. Vanilla's biomes fill the whole climate
+without gaps, so at every spot one of them fits exactly. Your biome therefore only appears where **every** value
+is inside your ranges. With six values that can be a small part of your region.
+
+TerraBlender works differently: inside a region your biome only competes with "the rest" (boxes made from
+the parts of each value that are outside your ranges). Your biome wins wherever the climate is **closer to your
+ranges than to the rest**, so it also appears around them. Add `.overlay()` to get the same placement:
+
+```java
+.addBiome(ClimatePoints.builder()
+        .temperature(Temperature.between(Temperature.NEUTRAL, Temperature.WARM))
+        .humidity(Humidity.between(Humidity.NEUTRAL, Humidity.WET))
+        .continentalness(Continentalness.MID_INLAND, Continentalness.INLAND)
+        .erosion(Erosion.EROSION_5, Erosion.EROSION_6)
+        .depth(-1.0F, 1.0F)
+        .weirdness(Weirdness.MID_SLICE_NORMAL_DESCENDING, Weirdness.LOW_SLICE_NORMAL_DESCENDING)
+        .overlay(), ModBiomes.APPLE_GROVE)
+```
+
+- **Moving from TerraBlender?** Use the same values plus `.overlay()` and your biomes appear about as often as
+  before. Measured with four biomes moved from TerraBlender (same seed, same area): TerraBlender 5.5% of the
+  land, Biome API without `overlay()` about 1%, with `overlay()` 5.8%.
+- A single value works too, e.g. `.temperature(-0.45F, -0.45F)`: without `overlay()` such a biome almost
+  never appears, with it the biome owns the climate around that value.
+- All overlay biomes of one region are worked out together (like one TerraBlender region). Chances and
+  `exclusive(...)` work as usual. Where "the rest" is closer, the normal rules decide (vanilla, other
+  `addBiome` points, replacements).
+- Needs Biome API **1.1.0** or newer: use `">=1.1.0"` in your `fabric.mod.json`.
 
 ### Example: biomes that should not appear together
 
